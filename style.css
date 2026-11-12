@@ -2,3 +2,14 @@
 .pet.learned.pat img{animation:balance .85s ease-in-out}
 @keyframes balance{30%{transform:rotate(-9deg)}65%{transform:translateY(-10px) rotate(7deg)}}
 @media(prefers-reduced-motion:reduce){.pet.learned.pat img{animation:none}}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.wordmark img {
+  display: block;
+  object-fit: cover;
+}
