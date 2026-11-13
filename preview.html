@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Duvie · Phone preview</title>
+  <style>
+    :root {
+      color-scheme: light;
+      background: #ede7df;
+      color: #39332e;
+      font: 16px/1.5 system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+
+    main {
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px 24px;
+      padding: 14px clamp(16px, 4vw, 32px);
+      border-bottom: 1px solid #ded3c6;
+      background: #fbf7ef;
+    }
+
+    h1 { margin: 0; font-size: 1.125rem; font-weight: 600; }
+
+    .toolbar p {
+      margin: 2px 0 0;
+      color: #68615a;
+      font-size: .875rem;
+    }
+
+    .sizes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    button {
+      min-height: 44px;
+      padding: 5px 12px;
+      background: #fffdfa;
+      color: #39332e;
+      border: 1px solid #ded3c6;
+      border-radius: 8px;
+      cursor: pointer;
+      font: inherit;
+      font-size: .875rem;
+    }
+
+    button[aria-pressed="true"] {
+      background: #e7eef0;
+      color: #284b57;
+      border-color: #8ca4ad;
+    }
+
+    button:focus-visible {
+      outline: 2px solid #365d6a;
+      outline-offset: 2px;
+    }
+
+    .stage {
+      display: grid;
+      place-items: center;
+      flex: 1 0 360px;
+      min-width: 0;
+    }
+
+    .device-space {
+      position: relative;
+    }
+
+    .device {
+      position: absolute;
+      inset: 0 auto auto 0;
+      transform: scale(var(--scale, 1));
+      transform-origin: top left;
+      border: 10px solid #3d352e;
+      border-radius: 36px;
+      overflow: hidden;
+      box-shadow: 0 12px 30px #44342535;
+      background: #fbf7ef;
+    }
+
+    .device-screen {
+      display: grid;
+      width: 402px;
+      height: 874px;
+      grid-template-rows: 62px minmax(0, 1fr) 34px;
+      background: #fbf7ef;
+    }
+
+    .device[data-cutout="notch"] .device-screen {
+      grid-template-rows: 50px minmax(0, 1fr) 34px;
+    }
+
+    .status-bar {
+      position: relative;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 26px 0 30px;
+      color: #1d1a18;
+      font: 650 16px/1 -apple-system, system-ui, sans-serif;
+      font-variant-numeric: tabular-nums;
+      background: #fbf7ef;
+    }
+
+    .cutout {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 98px;
+      height: 30px;
+      border-radius: 999px;
+      background: #151312;
+    }
+
+    .device[data-cutout="notch"] .status-bar { padding-inline: 23px 20px; }
+
+    .device[data-cutout="notch"] .cutout {
+      top: 0;
+      width: 145px;
+      height: 27px;
+      border-radius: 0 0 16px 16px;
+    }
+
+    .indicators, .signal {
+      display: flex;
+      align-items: center;
+    }
+
+    .indicators { gap: 5px; }
+    .signal { align-items: end; gap: 1.5px; }
+    .signal span {
+      width: 3px;
+      height: var(--bar);
+      border-radius: 1px;
+      background: currentColor;
+    }
+
+    .wifi {
+      position: relative;
+      width: 15px;
+      height: 12px;
+      border-top: 2px solid;
+      border-radius: 50%;
+      transform: translateY(1px);
+    }
+
+    .wifi::before, .wifi::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .wifi::before {
+      top: 2px;
+      width: 9px;
+      height: 6px;
+      border-top: 2px solid;
+      border-radius: 50%;
+    }
+
+    .wifi::after {
+      top: 6px;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .battery {
+      position: relative;
+      display: grid;
+      place-items: center;
+      margin-right: 2px;
+      width: 27px;
+      height: 14px;
+      background: linear-gradient(to right, #1d1a18 86%, #e1d9ce 86%);
+      color: #fffdfa;
+      font-size: 9px;
+      border-radius: 4px;
+    }
+
+    .battery::after {
+      content: "";
+      position: absolute;
+      right: -2px;
+      top: 5px;
+      width: 1.5px;
+      height: 4px;
+      border-radius: 0 2px 2px 0;
+      background: #80766d;
+    }
+
+    iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      border: 0;
+    }
+
+    .home-area {
+      display: grid;
+      justify-items: center;
+      align-items: end;
+      padding-bottom: 8px;
+      background: #fffdfa;
+    }
+
+    .home-indicator {
+      width: 134px;
+      height: 5px;
+      border-radius: 999px;
+      background: #1d1a18;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="toolbar">
+      <div>
+        <h1>Duvie phone preview</h1>
+        <p id="preview-size" role="status"></p>
+      </div>
+      <div class="sizes" role="group" aria-label="Phone screen size">
+        <button type="button" data-width="402" data-height="874" data-cutout="island" aria-pressed="true">iPhone 18 Pro</button>
+        <button type="button" data-width="440" data-height="956" data-cutout="island" aria-pressed="false">iPhone 18 Pro Max</button>
+        <button type="button" data-width="375" data-height="812" data-cutout="notch" aria-pressed="false">iPhone 13 mini</button>
+      </div>
+    </header>
+    <div class="stage">
+      <div class="device-space">
+        <div class="device" data-cutout="island">
+          <div class="device-screen">
+            <div class="status-bar" aria-hidden="true">
+              <span id="clock">9:41</span>
+              <span class="cutout"></span>
+              <span class="indicators">
+                <span class="signal"><span style="--bar: 4px"></span><span style="--bar: 6px"></span><span style="--bar: 9px"></span><span style="--bar: 12px"></span></span>
+                <span class="wifi"></span>
+                <span class="battery">86%</span>
+              </span>
+            </div>
+            <iframe src="index.html" title="Duvie on a phone screen"></iframe>
+            <div class="home-area" aria-hidden="true"><span class="home-indicator"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script>
+    const stage = document.querySelector('.stage');
+    const space = document.querySelector('.device-space');
+    const device = document.querySelector('.device');
+    const screen = document.querySelector('.device-screen');
+    const clock = document.querySelector('#clock');
+    const status = document.querySelector('#preview-size');
+    const sizes = document.querySelectorAll('.sizes button');
+    let selected = document.querySelector('[aria-pressed="true"]');
+
+    function fitDevice() {
+      const scale = Math.min(
+        1,
+        Math.max(1, stage.clientWidth - 32) / device.offsetWidth,
+        Math.max(1, stage.clientHeight - 44) / device.offsetHeight
+      );
+      space.style.width = `${device.offsetWidth * scale}px`;
+      space.style.height = `${device.offsetHeight * scale}px`;
+      device.style.setProperty('--scale', scale);
+      status.textContent = `${selected.dataset.width} × ${selected.dataset.height} px · ${Math.round(scale * 100)}% zoom`;
+    }
+
+    function selectSize(button) {
+      selected.setAttribute('aria-pressed', 'false');
+      selected = button;
+      selected.setAttribute('aria-pressed', 'true');
+      device.dataset.cutout = button.dataset.cutout;
+      screen.style.width = `${button.dataset.width}px`;
+      screen.style.height = `${button.dataset.height}px`;
+      fitDevice();
+    }
+
+    const clockFormat = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+    function updateClock() {
+      clock.textContent = clockFormat.formatToParts(new Date())
+        .filter(({type}) => type === 'hour' || type === 'minute' || type === 'literal')
+        .map(({value}) => value)
+        .join('').trim();
+    }
+
+    updateClock();
+    setInterval(updateClock, 1000);
+    sizes.forEach((button) => button.addEventListener('click', () => selectSize(button)));
+    selectSize(selected);
+    new ResizeObserver(fitDevice).observe(stage);
+  </script>
+</body>
+</html>

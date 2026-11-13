@@ -31,7 +31,13 @@ function countRoutines(day, partner) {
 const percentage = (done, due) => Math.round(done * 100 / due);
 const currentAnswers = () => state.answers[week()] || {};
 const time = (value) => new Date('2000-01-01T' + value).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
-const back = (target, label) => `<button class="back" data-go="${target}">← ${label}</button>`;
+function pageHeading(title, { parent, subtitle } = {}) {
+  return `<div class="page-heading">
+    ${parent ? `<button class="back" data-go="${parent.toLowerCase()}"><span aria-hidden="true">←</span> ${parent}</button>` : ''}
+    <h1>${title}</h1>
+    ${subtitle ? `<p class="muted">${subtitle}</p>` : ''}
+  </div>`;
+}
 
 function dailyCommitment() {
   if (date > today()) return 'Routines open on this day.';
@@ -42,7 +48,7 @@ function dailyCommitment() {
 
 function routineTable() {
   const future = date > today();
-  return `<section>
+  return `<section class="panel">
     <h2 id="routine-title">Daily routines</h2>
     <table class="routine-table" aria-labelledby="routine-title">
       <thead><tr><th scope="col">Routine</th>${partners.map((partner) => `<th scope="col">${partner}</th>`).join('')}</tr></thead>
@@ -60,41 +66,59 @@ function todayView() {
   const start = monday(new Date(date + 'T12:00:00'));
   const days = Array.from({length:7}, (_, i) => offset(start,i));
   const events = state.events.filter((event) => event.date === date).sort((a,b) => a.start.localeCompare(b.start));
-  return `<h1>Today</h1><p class="muted">${longDate(date)}</p>
-    <div class="week" aria-label="Select a day">${days.map((day) => `<button data-date="${localDate(day)}" aria-pressed="${localDate(day) === date}"><span>${day.toLocaleDateString(undefined,{weekday:'short'})}</span><span>${day.getDate()}</span></button>`).join('')}</div>
-    <div class="row"><button data-week="-7" aria-label="Previous week">←</button><button data-date="${today()}">Today</button><button data-week="7" aria-label="Next week">→</button></div>
-    <section><div class="heading"><h2>Schedule</h2><button data-go="event">+ Add event</button></div>
-    ${events.length ? events.map((event) => `<div class="row event"><small>${time(event.start)}</small><span>${esc(event.title)} <small>· ${esc(event.owner)}${event.end ? ' · until ' + time(event.end) : ''}</small></span><button data-edit="${event.id}" aria-label="Edit ${esc(event.title)}">Edit</button></div>`).join('') : '<p class="muted">Nothing scheduled for this day.</p>'}</section>
+  return `${pageHeading('Today', { subtitle: longDate(date) })}
+    <div class="panel calendar">
+      <div class="row calendar-controls">
+        <button data-week="-7" aria-label="Previous week">←</button>
+        <button data-date="${today()}">Today</button>
+        <button data-week="7" aria-label="Next week">→</button>
+      </div>
+      <div class="week" role="group" aria-label="Select a day">${days.map((day) => `<button data-date="${localDate(day)}" aria-label="${longDate(localDate(day))}" aria-pressed="${localDate(day) === date}">
+        <span class="day-name">${day.toLocaleDateString(undefined, { weekday: 'short' })}</span>
+        <span class="day-number">${day.getDate()}</span>
+      </button>`).join('')}</div>
+    </div>
+    <section class="panel">
+      <div class="heading"><h2>Schedule</h2><button class="action" data-go="event">+ Add event</button></div>
+      ${events.length ? `<div class="event-list">${events.map((event) => `<div class="row event">
+        <time class="muted" datetime="${esc(event.start)}">${time(event.start)}</time>
+        <span>${esc(event.title)}<small>${esc(event.owner)}${event.end ? ' · until ' + time(event.end) : ''}</small></span>
+        <button data-edit="${esc(event.id)}" aria-label="Edit ${esc(event.title)}">Edit</button>
+      </div>`).join('')}</div>` : '<p class="muted">Nothing scheduled for this day.</p>'}
+    </section>
     ${routineTable()}`;
 }
 
 function eventView() {
   const event = state.events.find(({id}) => id === editing);
-  return `${back('today','Today')}<h1>${event ? 'Edit event' : 'Add to schedule'}</h1><p class="muted">${longDate(date)}</p>
+  return `${pageHeading(event ? 'Edit event' : 'Add to schedule', { parent: 'Today', subtitle: longDate(date) })}
+  <div class="panel">
   <form id="event"><label>Event<input name="title" required maxlength="90" value="${esc(event?.title || '')}" placeholder="Dinner together"></label>
-  <div class="times"><label>Starts<input name="start" type="time" required value="${event?.start || ''}"></label><label>Ends <small>Optional</small><input name="end" type="time" value="${event?.end || ''}"></label></div>
+  <div class="times"><label>Starts<input name="start" type="time" required value="${event?.start || ''}"></label><label><span>Ends <small>optional</small></span><input name="end" type="time" value="${event?.end || ''}"></label></div>
   <label>For<select name="owner" required>
     <option value="" disabled ${event ? '' : 'selected'}>Choose who this is for</option>
     ${[...partners, 'Together'].map((owner) => `<option ${owner === event?.owner ? 'selected' : ''}>${owner}</option>`).join('')}
   </select></label>
   <button class="primary">Save event</button><p class="error" role="alert" id="error"></p></form>
-  ${event ? '<button data-delete>Delete event</button>' : ''}`;
+  ${event ? '<button class="danger" data-delete>Delete event</button>' : ''}
+  </div>`;
 }
 
 function nookView() {
   const count = Object.values(state.answers).filter((answers) => answers.Lyn && answers.Edison).length;
-  return `<h1>Nook</h1><button class="pet${count ? " learned" : ""}" data-pat><img src="nook-otter.png" alt="Otter floating with a stone">Tap to say hi</button>
-  <p class="muted" id="pet-note" aria-live="polite">${count ? `${count} shared check-in${count === 1 ? '' : 's'} · Stone trick learned` : 'Finish a check-in together to teach your otter a stone trick.'}</p>
-  <section><h2>Weekly check-in</h2><div class="row"><span>What helped us this week?</span><button data-go="checkin">Open</button></div></section>`;
+  return `${pageHeading('Nook')}
+  <section class="panel nook-pet"><button class="pet${count ? " learned" : ""}" data-pat><img src="nook-otter.png" alt="Otter floating with a stone">Tap to say hi</button>
+  <p class="muted" id="pet-note" aria-live="polite">${count ? `${count} shared check-in${count === 1 ? '' : 's'} · Stone trick learned` : 'Finish a check-in together to teach your otter a stone trick.'}</p></section>
+  <section class="panel"><h2>Weekly check-in</h2><div class="row"><span>What helped us this week?</span><button class="action" data-go="checkin">Open</button></div></section>`;
 }
 
 function checkinView() {
   const answers = currentAnswers();
   const shared = partners.every((partner) => answers[partner]);
-  return `${back('nook','Nook')}<h1>Weekly check-in</h1>
-    <section><h2>What helped us this week?</h2>
+  return `${pageHeading('Weekly check-in', { parent: 'Nook' })}
+    <section class="panel"><h2>What helped us this week?</h2>
     <p class="muted">${shared ? 'You’ve both answered.' : 'Answers appear here once both of you have shared.'}</p>
-    ${partners.map((partner) => `<div class="row">
+    ${partners.map((partner) => `<div class="checkin-person"><div class="row">
       <strong>${partner}</strong>
       <button data-answer-for="${partner}" aria-label="${answers[partner] ? 'Edit' : 'Write'} ${partner}’s answer">${answers[partner] ? 'Edit answer' : 'Write answer'}</button>
     </div>
@@ -103,7 +127,7 @@ function checkinView() {
       <label>${partner}’s answer<textarea name="answer" required rows="5" maxlength="1500">${esc(answers[partner] || '')}</textarea></label>
       <button class="primary">${answers[partner] ? 'Update answer' : 'Share answer'}</button>
       <p class="error" role="alert" id="error"></p>
-    </form>` : ''}`).join('')}</section>`;
+    </form>` : ''}</div>`).join('')}</section>`;
 }
 
 function progressView() {
@@ -125,18 +149,40 @@ function progressView() {
 
 function goalView() {
   const milestones = state.milestones[goal];
-  return `${back('plan','Plan')}<h1>${goals[goal]} <span class="plant" aria-label="${milestones.filter((item) => item.done).length} milestones complete">${milestones.some((item) => item.done) ? '✿' : '♧'}</span></h1>
-  ${goal === 0 ? `<p class="muted">Through Nov 8, 2027 · Target over 90%</p><section><h2>Habit progress</h2><p class="muted">All routines due from Nov 8, 2026 through yesterday, up to the end of the plan.</p>${progressView()}</section>` : ''}
-  <section><h2>Next milestones</h2>${milestones.map((item,i) => item.done ? '' : `<div class="row"><span>${esc(item.title)}</span><button data-complete="${i}">Mark complete</button></div>`).join('')}
-  <form id="milestone"><label>Add a milestone<input name="title" required maxlength="140" placeholder="${goal === 1 ? 'Define what retirement means to us' : 'Choose a shared next step'}"></label><button class="primary">Add milestone</button><p class="error" role="alert" id="error"></p></form></section>
-  <section><h2>Milestone history</h2>${milestones.some((item) => item.done) ? milestones.map((item,i) => item.done ? `<div class="row"><span>${esc(item.title)} <small>· ${longDate(item.done)}</small></span><button data-complete="${i}">Undo</button></div>` : '').join('') : '<p class="muted">Completed milestones will appear here.</p>'}</section>`;
+  const completeCount = milestones.filter((item) => item.done).length;
+  const plant = `<span class="plant" role="img" aria-label="${completeCount} milestones complete">${completeCount ? '✿' : '♧'}</span>`;
+  return `${pageHeading(goals[goal] + ' ' + plant, {
+    parent: 'Plan',
+    subtitle: goal === 0 ? 'Through Nov 8, 2027 · Target over 90%' : ''
+  })}
+  ${goal === 0 ? `<section class="panel"><h2>Habit progress</h2><p class="muted">All routines due from Nov 8, 2026 through yesterday, up to the end of the plan.</p>${progressView()}</section>` : ''}
+  <section class="panel"><h2>Next milestones</h2>
+    ${milestones.map((item, i) => item.done ? '' : `<div class="row milestone">
+      <span>${esc(item.title)}</span><button data-complete="${i}">Mark complete</button>
+    </div>`).join('')}
+    <form id="milestone">
+      <label>Add a milestone<input name="title" required maxlength="140" placeholder="${goal === 1 ? 'Define retirement together' : 'Choose a shared next step'}"></label>
+      <button class="primary">Add milestone</button><p class="error" role="alert" id="error"></p>
+    </form>
+  </section>
+  <section class="panel"><h2>Milestone history</h2>
+    ${completeCount ? milestones.map((item, i) => item.done ? `<div class="row milestone">
+      <span>${esc(item.title)} <small>· ${longDate(item.done)}</small></span>
+      <button data-complete="${i}">Undo</button>
+    </div>` : '').join('') : '<p class="muted">Completed milestones will appear here.</p>'}
+  </section>`;
 }
 
 function planView() {
-  return `<h1>Plan</h1><section><h2>Our one-year plan</h2><p>Target · over 90%</p>
-    <p class="muted">Commitment through yesterday</p>${progressView()}
-    <button data-goal="0">Open plan</button></section>
-  <section><h2>Retire by 30</h2><p class="muted">${esc(state.milestones[1].find((item) => !item.done)?.title || 'Choose your next milestone together.')}</p><button data-goal="1">Open goal</button></section>`;
+  return `${pageHeading('Plan')}
+    <section class="panel"><h2>Our one-year plan</h2><p>Target · over 90%</p>
+      <p class="muted">Commitment through yesterday</p>${progressView()}
+      <button class="action" data-goal="0">Open plan</button>
+    </section>
+    <section class="panel"><h2>Retire by 30</h2>
+      <p class="muted goal-summary">${esc(state.milestones[1].find((item) => !item.done)?.title || 'Choose your next milestone together.')}</p>
+      <button class="action" data-goal="1">Open goal</button>
+    </section>`;
 }
 
 const views = {today:todayView,event:eventView,nook:nookView,checkin:checkinView,plan:planView,goal:goalView};
@@ -161,6 +207,7 @@ document.addEventListener('click', (event) => {
       ? 'Your otter balances the stone and catches it.' : 'Your otter gives a little wiggle.';
     return;
   }
+  const previousPage = page;
   if (tab || go) { page = tab || go; editing = null; answerAuthor = null; }
   else if (button.dataset.answerFor) answerAuthor = button.dataset.answerFor;
   else if (day) date = day;
@@ -179,6 +226,7 @@ document.addEventListener('click', (event) => {
     save();
   } else return;
   render();
+  if (page !== previousPage) window.scrollTo(0, 0);
 });
 
 screen.addEventListener('change', ({target}) => {

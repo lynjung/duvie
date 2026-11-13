@@ -1,20 +1,36 @@
 <!doctype html>
 <html lang="en">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Duvie</title>
-<link rel="stylesheet" href="style.css">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fbf7ef">
+  <title>Duvie</title>
+  <link rel="stylesheet" href="style.css">
+</head>
 <body>
-<div class="shell">
-<header>
-  <span class="wordmark">
-    <img src="duvie-paws-side-tails.png" alt="" width="48" height="36">
-    duvie
-  </span>
-</header>
-<main id="screen"></main>
-<nav aria-label="Main navigation"><button data-page="today">Today</button><button data-page="nook">Nook</button><button data-page="plan">Plan</button></nav>
-</div>
-<script src="app.js" defer></script>
+  <div class="shell">
+    <header class="app-header">
+      <span class="wordmark">
+        <img src="duvie-paws-side-tails.png" alt="" width="48" height="36">
+        duvie
+      </span>
+    </header>
+    <main id="screen"></main>
+    <nav class="tab-bar" aria-label="Main navigation">
+      <button type="button" data-page="today">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M8 3v4m8-4v4m-5 8h2"/></svg>
+        Today
+      </button>
+      <button type="button" data-page="nook">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM9 20v-6h6v6"/></svg>
+        Nook
+      </button>
+      <button type="button" data-page="plan">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20v-8m0 2c-5 0-7-3-7-7 4 0 7 2 7 7Zm0-2c0-4 2-7 7-7 0 4-2 7-7 7ZM8 20h8"/></svg>
+        Plan
+      </button>
+    </nav>
+  </div>
+  <script src="app.js" defer></script>
 </body>
 </html>
