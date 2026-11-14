@@ -35,6 +35,12 @@ For a framed phone preview, open [localhost:8000/preview.html](http://localhost:
 
 Duvie is under active development. The local checkout is configured for Supabase. Both Duvie accounts are linked to the same shared space. A routine completion has been verified after sign-in and reload. Cross-device sync testing is pending. Earlier browser-only records stay on their original browser and site address until imported.
 
+## Sign in
+
+Open [Duvie](https://duvie.vercel.app/) directly in Safari or your preferred browser. Use your invited email and password. To choose your first password or replace one you forgot, use **Set or reset password**, then open the email link in that browser. You can also sign in with an email link and set a password under **Profile → Settings**. Existing invite links still work.
+
+Duvie keeps your session in the browser that completed sign-in. Each browser, website address, or private browsing session can require its own sign-in. In an ordinary Safari tab, reopening Duvie should restore your session, and Safari can autofill your saved password when sign-in is needed.
+
 ## Profile photos
 
 Use **Profile → Edit your profile** to choose, save, or remove your photo. Duvie center-crops images to 256 × 256 pixels. Both members of a shared space can see the photo, and each account can change its own. For a new Supabase project, apply the membership migration first and the profile photo migration second.

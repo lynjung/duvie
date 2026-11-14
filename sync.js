@@ -34,7 +34,20 @@
         throw new Error('Set the Supabase HTTPS project URL and publishable key.');
       }
       const sdk = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.98.0/+esm');
-      client = sdk.createClient(url, publishableKey);
+      // The SDK clears a valid link's fragment during initialization.
+      const link = new URLSearchParams(location.hash.slice(1));
+      const type = link.get('type');
+      const setupLink = link.has('access_token') && (type === 'recovery' || type === 'invite');
+      client = sdk.createClient(url, publishableKey, {
+        auth: {persistSession: true, autoRefreshToken: true, detectSessionInUrl: true}
+      });
+      const {error} = await client.auth.initialize();
+      const linkFailed = link.has('error_code') || link.has('error_description') || (link.has('access_token') && Boolean(error));
+      if (linkFailed) history.replaceState(history.state, '', location.pathname + location.search);
+      const {session} = rows(await client.auth.getSession());
+      return {session, setupPassword: Boolean(setupLink && !linkFailed && session), linkFailed};
+    },
+    async getSession() {
       return rows(await client.auth.getSession()).session;
     },
     onSessionChange(callback) {
@@ -43,10 +56,21 @@
         setTimeout(() => callback(session), 0);
       });
     },
+    async signIn(email, password) {
+      return rows(await client.auth.signInWithPassword({email, password})).session;
+    },
+    async sendPasswordLink(email) {
+      return rows(await client.auth.resetPasswordForEmail(email, {
+        redirectTo: new URL('/', location.origin).href
+      }));
+    },
+    async updatePassword(password) {
+      rows(await client.auth.updateUser({password}));
+    },
     async sendLink(email) {
       return rows(await client.auth.signInWithOtp({
         email,
-        options: {shouldCreateUser: false, emailRedirectTo: location.origin + location.pathname}
+        options: {shouldCreateUser: false, emailRedirectTo: new URL('/', location.origin).href}
       }));
     },
     async signOut() {

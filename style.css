@@ -643,3 +643,17 @@ textarea { resize: vertical; }
 .edit-profile .photo-picker input { position: absolute; inset: 0; height: 100%; opacity: 0; cursor: pointer; }
 .edit-profile .error:empty { display: none; }
 .edit-profile button:disabled { opacity: .55; cursor: default; }
+
+.auth-options {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 8px;
+}
+
+.auth-options button, .auth-option {
+  padding-inline: 0;
+  font-size: .9375rem;
+}
+
+.auth-options, .auth-option { margin-top: 8px; }

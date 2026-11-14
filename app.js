@@ -12,6 +12,10 @@ syncMessage.hidden = true;
 screen.before(syncMessage);
 let member = null;
 let sessionId;
+let sessionEmail = '';
+let authView = 'sign-in';
+let authEmail = '';
+let authBusy = false;
 let connection = sync ? 'loading' : 'local';
 let connectionVersion = 0;
 let saving = false;
@@ -384,6 +388,9 @@ function settingsView() {
       <button class="profile-link" data-go="troubleshooting">
         <span>Troubleshooting</span><span class="profile-chevron" aria-hidden="true">›</span>
       </button>
+      <button class="profile-link" data-go="password">
+        <span>Set or change password</span><span class="profile-chevron" aria-hidden="true">›</span>
+      </button>
       <button class="profile-link" data-sign-out>Sign out</button>
     </section>` : ''}`;
 }
@@ -448,8 +455,22 @@ async function makeProfilePhoto(file) {
 const views = {
   nook: nookView, planner: plannerView, event: eventView, checkin: checkinView,
   routines: routinesView, goals: goalsView, goal: goalView, profile: profileView,
-  settings: settingsView, couple: coupleView, troubleshooting: troubleshootingView, 'edit-profile': editProfileView
+  settings: settingsView, couple: coupleView, troubleshooting: troubleshootingView, 'edit-profile': editProfileView, password: () => passwordView(false)
 };
+
+function passwordView(fromLink) {
+  return `${pageHeading(fromLink ? 'Set your password' : 'Set or change password', fromLink ? {} : {parent: 'Settings'})}
+    <div class="panel">
+      <form id="set-password" method="post">
+        <label>Email<input type="email" name="email" autocomplete="username" value="${esc(sessionEmail)}" readonly></label>
+        <label>New password<input type="password" name="password" autocomplete="new-password" minlength="12" maxlength="72" required></label>
+        <label>Confirm password<input type="password" name="confirmation" autocomplete="new-password" minlength="12" maxlength="72" required></label>
+        <p class="muted">Use at least 12 characters.</p>
+        <button class="primary">Save password</button>
+      </form>
+      ${fromLink ? '<button class="auth-option" data-skip-password>Skip for now</button>' : ''}
+    </div>`;
+}
 
 function connectionView() {
   if (connection === 'loading') return '<h1>Connecting to Duvie…</h1>';
@@ -457,18 +478,31 @@ function connectionView() {
   if (connection === 'unlinked') {
     return '<h1>Pairing pending</h1><p>Your account needs to be linked to the Duvie space.</p><button data-sign-out>Sign out</button>';
   }
-  return `${pageHeading('Sign in')}
-    <div class="panel"><form id="sign-in">
-      <label>Invited email address<input type="email" name="email" autocomplete="email" required></label>
-      <button class="primary">Send sign-in link</button>
-    </form></div>`;
+  if (connection === 'password-setup') return passwordView(true);
+
+  const passwordSignIn = authView === 'sign-in';
+  const reset = authView === 'password-link';
+  const title = passwordSignIn ? 'Sign in' : reset ? 'Set or reset password' : 'Email me a sign-in link';
+  const submit = passwordSignIn ? 'Sign in' : reset ? 'Send password link' : 'Send sign-in link';
+  return `${pageHeading(title)}
+    <div class="panel">
+      <form id="${authView}" method="post">
+        <label>Invited email address<input type="email" name="email" autocomplete="username" autocapitalize="none" value="${esc(authEmail)}" required></label>
+        ${passwordSignIn ? '<label>Password<input type="password" name="password" autocomplete="current-password" required></label>' : ''}
+        <button class="primary">${submit}</button>
+      </form>
+      ${passwordSignIn ? `<div class="auth-options">
+        <button data-auth-view="password-link">Set or reset password</button>
+        <button data-auth-view="email-link">Email me a sign-in link</button>
+      </div>` : '<button class="auth-option" data-auth-view="sign-in">Back to sign in</button>'}
+    </div>`;
 }
 
 function render() {
   nav.hidden = Boolean(sync && connection !== 'ready');
   screen.innerHTML = nav.hidden ? connectionView() : views[page]();
   const parent = {event: 'planner', checkin: 'nook', routines: 'goals', goal: 'goals',
-    settings: 'profile', couple: 'profile', troubleshooting: 'profile', 'edit-profile': 'profile'}[page] || page;
+    settings: 'profile', couple: 'profile', troubleshooting: 'profile', 'edit-profile': 'profile', password: 'profile'}[page] || page;
   document.querySelectorAll('nav button').forEach((button) => {
     if (button.dataset.page === parent) button.setAttribute('aria-current','page');
     else button.removeAttribute('aria-current');
@@ -483,23 +517,26 @@ function animationsEnabled() {
   return sync ? localStorage.getItem(animationKey()) !== 'false' : state.otterAnimations !== false;
 }
 
-async function showSession(session) {
+async function showSession(session, {setupPassword = false, continueSetup = false} = {}) {
   const nextId = session?.user?.id || null;
-  if (nextId === sessionId) return;
+  if (nextId === sessionId && !setupPassword && !continueSetup) return;
   sessionId = nextId;
+  sessionEmail = session?.user?.email ?? '';
   const version = ++connectionVersion;
   member = null;
   profilePartner = null;
   draftPhoto = null;
   state.profilePhotos = {};
   state.spaceMembers = [];
-  connection = session ? 'loading' : 'sign-in';
+  connection = session ? (setupPassword ? 'password-setup' : 'loading') : 'sign-in';
+  authView = 'sign-in';
+  authEmail = '';
   page = 'nook';
   editing = null;
   answerAuthor = null;
   render();
   report('');
-  if (!session) return;
+  if (!session || setupPassword) return;
 
   try {
     const identity = await sync.member(nextId);
@@ -515,6 +552,86 @@ async function showSession(session) {
     connection = 'error';
   }
   render();
+}
+
+async function finishPasswordSetup() {
+  try {
+    await showSession(await sync.getSession(), {continueSetup: true});
+  } catch {
+    report('Could not finish signing in. Reload Duvie to try again.');
+  }
+}
+
+async function submitAuth(form, data, submit) {
+  if (authBusy) return;
+  const id = form.id;
+  const email = data.email.trim();
+  const password = data.password;
+  if (id === 'set-password') {
+    if (password !== data.confirmation) return report('The passwords don’t match.');
+    if (password.length < 12 || new TextEncoder().encode(password).length > 72) {
+      return report('Use 12 to 72 characters. Some symbols and emoji take more space.');
+    }
+  }
+
+  authBusy = true;
+  screen.inert = true;
+  nav.inert = true;
+  const version = connectionVersion;
+  const wasSetup = connection === 'password-setup';
+  try {
+    if (id === 'sign-in') {
+      report('Signing in…');
+      const session = await sync.signIn(email, password);
+      // Safari can offer to save or autofill credentials from the password form.
+      await showSession(session);
+    } else if (id === 'set-password') {
+      report('Saving password…');
+      await sync.updatePassword(password);
+      form.reset();
+      if (version !== connectionVersion) return;
+      if (wasSetup) await finishPasswordSetup();
+      else {
+        page = 'settings';
+        render();
+      }
+      if (connection === 'ready') report('Password saved.');
+    } else {
+      report('Sending email…');
+      if (id === 'password-link') await sync.sendPasswordLink(email);
+      else await sync.sendLink(email);
+      if (version === connectionVersion) {
+        report('If this email can receive Duvie links, one should arrive shortly. Open it in Safari.');
+      }
+    }
+  } catch (error) {
+    if (version !== connectionVersion) return;
+    const code = error?.code;
+    if (code === 'over_email_send_rate_limit' || code === 'over_request_rate_limit') {
+      report('Too many attempts. Wait a little, then try again.');
+    } else if (code === 'email_address_not_authorized') {
+      report('Duvie could not send an email to this address. If you have your original invite, open that in Safari.');
+    } else if (id === 'sign-in') {
+      report(code === 'invalid_credentials' || code === 'email_not_confirmed'
+        ? 'Couldn’t sign in. Check your email and password, or use Set or reset password.'
+        : 'Couldn’t connect to sign in. Try again in a moment.');
+    } else if (id === 'set-password') {
+      if (code === 'reauthentication_needed' || code === 'session_not_found') {
+        report('Duvie needs a fresh sign-in. Sign out, then use Set or reset password.');
+      } else if (code === 'weak_password' || code === 'same_password') {
+        report('Choose a stronger password you haven’t used for Duvie before.');
+      } else {
+        report('Couldn’t save your password. Try again in a moment.');
+      }
+    } else {
+      report('Couldn’t send the email. Check your address and try again.');
+    }
+  } finally {
+    authBusy = false;
+    screen.inert = false;
+    nav.inert = false;
+    if (screen.contains(form)) submit.focus({preventScroll: true});
+  }
 }
 
 async function refreshShared(manual = false) {
@@ -544,7 +661,19 @@ async function refreshShared(manual = false) {
 
 document.addEventListener('click', async (event) => {
   const button = event.target.closest('button');
-  if (!button || saving) return;
+  if (!button || saving || authBusy) return;
+  if (button.hasAttribute('data-skip-password')) {
+    await finishPasswordSetup();
+    return;
+  }
+  if (button.dataset.authView && connection === 'sign-in') {
+    authEmail = screen.querySelector('input[name="email"]').value;
+    authView = button.dataset.authView;
+    report('');
+    render();
+    screen.querySelector('input[name="email"]').focus();
+    return;
+  }
   if (button.hasAttribute('data-sign-out')) {
     button.disabled = true;
     try {
@@ -684,18 +813,8 @@ screen.addEventListener('change', async ({target}) => {
 screen.addEventListener('submit', async (event) => {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.target));
-  if (event.target.id === 'sign-in') {
-    const submit = event.submitter || event.target.querySelector('button');
-    submit.disabled = true;
-    report('Sending sign-in link…');
-    try {
-      await sync.sendLink(data.email.trim());
-      report('Check your email for a sign-in link.');
-    } catch {
-      report('Could not send a link. Check the invited address and try again.');
-    } finally {
-      submit.disabled = false;
-    }
+  if (sync && ['sign-in', 'password-link', 'email-link', 'set-password'].includes(event.target.id)) {
+    await submitAuth(event.target, data, event.submitter || event.target.querySelector('[type="submit"], button.primary'));
     return;
   }
   if (saving || (sync && connection !== 'ready')) return;
@@ -756,9 +875,10 @@ screen.addEventListener('submit', async (event) => {
 render();
 
 if (sync) {
-  sync.connect().then((session) => {
+  sync.connect().then(async ({session, setupPassword, linkFailed}) => {
     sync.onSessionChange(showSession);
-    return showSession(session);
+    await showSession(session, {setupPassword});
+    if (linkFailed && !session) report('This email link is expired or already used. Request a new one below.');
   }).catch(() => {
     connection = 'error';
     render();
