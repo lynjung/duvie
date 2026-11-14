@@ -8,6 +8,7 @@ A cozy app for couples to organize schedules, track daily routines, reflect toge
 
 - **Planner** has Day, Week, and Month views for the shared schedule. Week shows the full week’s events. In Month, pick a date to see its agenda.
 - **Goals** brings daily routine logging, individual and combined commitment, and goal milestones together.
+- **Profile** shows the two linked accounts and their profile photos. Use the gear to open Settings. Manual sync lives under **Settings → Troubleshooting**.
 - Weekly check-ins and an interactive otter companion.
 - A responsive layout for phones and desktop browsers.
 
@@ -34,9 +35,14 @@ For a framed phone preview, open [localhost:8000/preview.html](http://localhost:
 
 Duvie is under active development. The local checkout is configured for Supabase. Both Duvie accounts are linked to the same shared space. A routine completion has been verified after sign-in and reload. Cross-device sync testing is pending. Earlier browser-only records stay on their original browser and site address until imported.
 
+## Profile photos
+
+Use **Profile → Edit your profile** to choose, save, or remove your photo. Duvie center-crops images to 256 × 256 pixels. Both members of a shared space can see the photo, and each account can change its own. For a new Supabase project, apply the membership migration first and the profile photo migration second.
+
 ## Checks
 
 ```sh
 node --check app.js
+node --check sync.js
 git diff --check
 ```

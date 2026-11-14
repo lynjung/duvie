@@ -7,7 +7,8 @@
     events: 'duvie_events',
     routines: 'duvie_routines',
     milestones: 'duvie_milestones',
-    answers: 'duvie_answers'
+    answers: 'duvie_answers',
+    profilePhotos: 'duvie_profile_photos'
   };
 
   function rows({data, error}) {
@@ -55,12 +56,13 @@
       return rows(await client.from('duvie_members').select('space_id,name,user_id').eq('user_id', userId).maybeSingle());
     },
     async load(spaceId) {
-      const [members, events, routines, milestones, answers] = await Promise.all([
+      const [members, events, routines, milestones, answers, photos] = await Promise.all([
         read('duvie_members', spaceId, ['name']),
         read(tables.events, spaceId, ['id']),
         read(tables.routines, spaceId, ['member_id', 'day', 'habit']),
         read(tables.milestones, spaceId, ['created_at', 'id']),
-        read(tables.answers, spaceId, ['author_id', 'week_start'])
+        read(tables.answers, spaceId, ['author_id', 'week_start']),
+        read(tables.profilePhotos, spaceId, ['member_id'])
       ]);
       const names = Object.fromEntries(members.map(({user_id, name}) => [user_id, name]));
       const logs = {};
@@ -79,7 +81,9 @@
       return {
         events: events.map(({id, day, title, starts, ends, owner}) =>
           ({id, date: day, title, start: starts.slice(0, 5), end: ends?.slice(0, 5) || '', owner})),
-        logs, milestones: byGoal, answers: weekly
+        logs, milestones: byGoal, answers: weekly,
+        spaceMembers: members.map(({name}) => name),
+        profilePhotos: Object.fromEntries(photos.map(({member_id, photo}) => [names[member_id], photo]))
       };
     },
     async write(table, action, values, id) {

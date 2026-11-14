@@ -16,7 +16,7 @@ let connection = sync ? 'loading' : 'local';
 let connectionVersion = 0;
 let saving = false;
 let refreshing = false;
-const state = { events: [], logs: {}, answers: {}, milestones: [[], []] };
+const state = { events: [], logs: {}, answers: {}, milestones: [[], []], spaceMembers: [], profilePhotos: {} };
 if (!sync) Object.assign(state, JSON.parse(localStorage.getItem(key) || '{}'));
 
 const localDate = (date) => [date.getFullYear(), date.getMonth() + 1, date.getDate()]
@@ -51,7 +51,7 @@ async function storeChange(table, action, values, id) {
     report('');
     return true;
   } catch {
-    if (connectionVersion === version) report('Could not confirm the save. Refresh shared data in Profile, then try again.');
+    if (connectionVersion === version) report('Could not confirm the save. Go to Profile → Settings → Troubleshooting to refresh, then try again.');
     return false;
   } finally {
     saving = false;
@@ -67,6 +67,8 @@ let page = 'nook';
 let editing = null;
 let goal = 0;
 let answerAuthor = null;
+let profilePartner = null;
+let draftPhoto = null;
 const routineLog = (day, partner) => state.logs[day]?.[partner] || {};
 function countRoutines(day, partner) {
   const log = routineLog(day, partner);
@@ -327,23 +329,126 @@ function goalsView() {
     </section>`;
 }
 
+const photoFormat = /^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/;
+
+function profileAvatar(name, photo = state.profilePhotos[name]) {
+  const image = photo && photoFormat.test(photo);
+  return `<div class="profile-avatar" aria-hidden="true">
+    ${image ? `<img src="${esc(photo)}" alt="">` : esc(name.charAt(0))}
+  </div>`;
+}
+
 function profileView() {
-  return `${pageHeading('Profile')}
-    <section class="panel"><h2>${member ? esc(member.name) : 'Your space'}</h2>
-      <p class="muted">Lyn &amp; Edison</p>
-      ${sync ? '<div class="row"><button data-refresh>Refresh shared data</button><button data-sign-out>Sign out</button></div>' : '<p class="muted">Entries are saved in this browser.</p>'}
-    </section>
+  const people = sync ? state.spaceMembers : partners;
+  return `<div class="heading profile-heading">
+    ${pageHeading('Profile')}
+    <button class="profile-settings" data-go="settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+        <path d="M10 3h4l.6 2.4 2 .9 2.2-1.2 2.1 3.5-1.8 1.8v2.4l1.8 1.8-2.1 3.5-2.2-1.1-2 .9L14 21h-4l-.6-2.4-2-.9-2.2 1.1L3 15.3l1.8-1.8v-2.4L3 9.3l2.2-3.5 2.2 1.2 2-.9Z"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+    </button>
+  </div>
+  <section class="panel couple-profile">
+    <div class="couple-portraits">
+      ${people.map((name) => `<div class="couple-person">
+        ${profileAvatar(name)}
+        <h2>${esc(name)}</h2>
+        ${member?.name === name ? '<p class="muted">You</p>' : ''}
+      </div>`).join('<span class="couple-heart" aria-hidden="true">♡</span>')}
+    </div>
+    <div class="profile-actions">
+      ${people.filter(canEdit).map((name) => `<button class="action" data-profile-for="${esc(name)}">${sync ? 'Edit your profile' : 'Edit ' + esc(name) + '’s photo'}</button>`).join('')}
+    </div>
+  </section>
+  ${sync ? `<button class="panel profile-link" data-go="couple">
+    <span><strong>Couple connection</strong><small>${people.length === 2 ? 'Connected' : 'Waiting for your partner'}</small></span>
+    <span class="profile-chevron" aria-hidden="true">›</span>
+  </button>` : '<p class="muted profile-local">Profiles are saved in this browser.</p>'}`;
+}
+
+function settingsView() {
+  return `${pageHeading('Settings', {parent: 'Profile'})}
     <section class="panel">
       <h2>Nook</h2>
       <label class="row setting-toggle"><span>Animate the otter</span>
         <input type="checkbox" id="otter-animation" ${animationsEnabled() ? 'checked' : ''}>
       </label>
+    </section>
+    ${sync ? `<section class="panel settings-account">
+      <h2>Account</h2>
+      <p class="muted">Signed in as ${esc(member.name)}</p>
+      <button class="profile-link" data-go="couple">
+        <span>Couple connection</span><span class="profile-chevron" aria-hidden="true">›</span>
+      </button>
+      <button class="profile-link" data-go="troubleshooting">
+        <span>Troubleshooting</span><span class="profile-chevron" aria-hidden="true">›</span>
+      </button>
+      <button class="profile-link" data-sign-out>Sign out</button>
+    </section>` : ''}`;
+}
+
+function coupleView() {
+  const partner = state.spaceMembers.find((name) => name !== member.name);
+  return `${pageHeading('Couple connection', {parent: 'Profile'})}
+    <section class="panel"><h2>${partner ? 'Connected' : 'Waiting for your partner'}</h2>
+      <p class="muted">${partner ? `You and ${esc(partner)} share this Duvie space.` : 'Your partner’s account can be linked to this Duvie space.'}</p>
     </section>`;
+}
+
+function troubleshootingView() {
+  return `${pageHeading('Troubleshooting', {parent: 'Settings'})}
+    <section class="panel">
+      <p>Use this if a photo, routine, or event is missing.</p>
+      <button class="profile-link" data-refresh>Refresh shared data</button>
+    </section>`;
+}
+
+function editProfileView() {
+  const photo = state.profilePhotos[profilePartner];
+  return `${pageHeading('Edit profile', {parent: 'Profile'})}
+    <section class="panel edit-profile">
+      ${profileAvatar(profilePartner)}
+      <h2>${esc(profilePartner)}</h2>
+      <form id="profile-photo">
+        <label class="action photo-picker">Choose photo
+          <input type="file" name="photo" accept="image/*" aria-describedby="photo-help">
+        </label>
+        <p class="muted" id="photo-help">${sync ? 'Your partner can see this photo.' : 'This photo stays in this browser.'}</p>
+        <p class="error" id="photo-error" role="alert"></p>
+        <div class="profile-actions">
+          <button class="primary" name="action" value="save" disabled>Save photo</button>
+          ${photo ? '<button name="action" value="remove">Remove photo</button>' : ''}
+        </div>
+      </form>
+    </section>`;
+}
+
+async function makeProfilePhoto(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    const size = Math.min(image.naturalWidth, image.naturalHeight);
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 256;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#fbf7ef';
+    context.fillRect(0, 0, 256, 256);
+    context.drawImage(image, (image.naturalWidth - size) / 2, (image.naturalHeight - size) / 2, size, size, 0, 0, 256, 256);
+    const photo = canvas.toDataURL('image/jpeg', 0.82);
+    if (!photoFormat.test(photo) || photo.length > 131072) throw new Error('Photo could not be prepared.');
+    return photo;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 const views = {
   nook: nookView, planner: plannerView, event: eventView, checkin: checkinView,
-  routines: routinesView, goals: goalsView, goal: goalView, profile: profileView
+  routines: routinesView, goals: goalsView, goal: goalView, profile: profileView,
+  settings: settingsView, couple: coupleView, troubleshooting: troubleshootingView, 'edit-profile': editProfileView
 };
 
 function connectionView() {
@@ -362,7 +467,8 @@ function connectionView() {
 function render() {
   nav.hidden = Boolean(sync && connection !== 'ready');
   screen.innerHTML = nav.hidden ? connectionView() : views[page]();
-  const parent = {event: 'planner', checkin: 'nook', routines: 'goals', goal: 'goals'}[page] || page;
+  const parent = {event: 'planner', checkin: 'nook', routines: 'goals', goal: 'goals',
+    settings: 'profile', couple: 'profile', troubleshooting: 'profile', 'edit-profile': 'profile'}[page] || page;
   document.querySelectorAll('nav button').forEach((button) => {
     if (button.dataset.page === parent) button.setAttribute('aria-current','page');
     else button.removeAttribute('aria-current');
@@ -383,6 +489,10 @@ async function showSession(session) {
   sessionId = nextId;
   const version = ++connectionVersion;
   member = null;
+  profilePartner = null;
+  draftPhoto = null;
+  state.profilePhotos = {};
+  state.spaceMembers = [];
   connection = session ? 'loading' : 'sign-in';
   page = 'nook';
   editing = null;
@@ -407,8 +517,8 @@ async function showSession(session) {
   render();
 }
 
-async function refreshShared() {
-  if (connection !== 'ready' || saving || refreshing) return;
+async function refreshShared(manual = false) {
+  if (connection !== 'ready' || saving || refreshing || screen.querySelector('form')) return;
   const version = connectionVersion;
   const initialScreen = screen.firstElementChild;
   refreshing = true;
@@ -422,10 +532,11 @@ async function refreshShared() {
       return;
     }
     Object.assign(state, shared);
-    report('');
+    report(manual ? 'Shared data refreshed.' : '');
     render();
+    if (manual) screen.querySelector('[data-refresh]')?.focus({preventScroll: true});
   } catch {
-    if (version === connectionVersion) report('Could not refresh. Try again in Profile.');
+    if (version === connectionVersion) report('Could not refresh. Try again in Profile → Settings → Troubleshooting.');
   } finally {
     refreshing = false;
   }
@@ -446,7 +557,7 @@ document.addEventListener('click', async (event) => {
     return;
   }
   if (button.hasAttribute('data-refresh')) {
-    await refreshShared();
+    await refreshShared(true);
     return;
   }
   if (sync && connection !== 'ready') return;
@@ -462,13 +573,23 @@ document.addEventListener('click', async (event) => {
     return;
   }
   const previousPage = page;
-  if (tab || go) {
+  if (button.dataset.profileFor) {
+    const name = button.dataset.profileFor;
+    if (!partners.includes(name) || !canEdit(name)) return;
+    profilePartner = name;
+    draftPhoto = null;
+    page = 'edit-profile';
+  } else if (tab || go) {
     if (page === 'nook' && go === 'planner') {
       plannerDate = today();
       plannerMode = 'Day';
     }
     if (page === 'goals' && go === 'routines') routineDate = today();
     page = tab || go;
+    if (previousPage === 'edit-profile') {
+      profilePartner = null;
+      draftPhoto = null;
+    }
     editing = null;
     answerAuthor = null;
   }
@@ -508,6 +629,30 @@ document.addEventListener('click', async (event) => {
 });
 
 screen.addEventListener('change', async ({target}) => {
+  if (target.form?.id === 'profile-photo') {
+    if (target.name !== 'photo') return;
+    const file = target.files[0];
+    if (!file) return;
+    const form = target.form;
+    const saveButton = form.querySelector('[value="save"]');
+    const error = form.querySelector('#photo-error');
+    draftPhoto = null;
+    saveButton.disabled = true;
+    error.textContent = '';
+    try {
+      const photo = await makeProfilePhoto(file);
+      if (!screen.contains(form) || target.files[0] !== file) return;
+      draftPhoto = photo;
+      form.parentElement.querySelector('.profile-avatar').outerHTML = profileAvatar(profilePartner, photo);
+      saveButton.disabled = false;
+    } catch {
+      if (!screen.contains(form) || target.files[0] !== file) return;
+      target.value = '';
+      form.parentElement.querySelector('.profile-avatar').outerHTML = profileAvatar(profilePartner);
+      error.textContent = 'Could not open that image. Try a JPEG or PNG.';
+    }
+    return;
+  }
   if (target.id === 'routine-date') {
     if (target.value && target.validity.valid) routineDate = target.value;
     render();
@@ -556,6 +701,20 @@ screen.addEventListener('submit', async (event) => {
   if (saving || (sync && connection !== 'ready')) return;
   const error = (message) => { document.querySelector('#error').textContent = message; };
   switch (event.target.id) {
+    case 'profile-photo': {
+      const name = profilePartner;
+      const removing = event.submitter?.value === 'remove';
+      const photo = removing ? null : draftPhoto;
+      if (!name || !canEdit(name) || (!removing && !photo)) return;
+      if (refreshing) return report('Duvie is refreshing. Try saving again in a moment.');
+      if (sync && !await storeChange('profilePhotos', 'upsert', {member_id: member.user_id, photo})) return;
+      state.profilePhotos[name] = photo;
+      profilePartner = null;
+      draftPhoto = null;
+      page = 'profile';
+      report(photo ? 'Profile photo saved.' : 'Profile photo removed.');
+      break;
+    }
     case 'event': {
       if (!data.title.trim()) return error('Enter an event name.');
       if (![...partners, 'Together'].includes(data.owner)) return error('Choose who the event is for.');
