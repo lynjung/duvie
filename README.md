@@ -37,7 +37,7 @@ Duvie is under active development. The local checkout is configured for Supabase
 
 ## Sign in
 
-Use **Sign in** with your existing email address and password. **Forgot password?** sends a reset link. Sign-in and recovery errors use a muted red banner. Progress and confirmations use the app accent color.
+Use **Sign in** with your existing email address and password. Sign-in and password screens share a narrow, mobile-first layout with the title, messages, fields, and actions aligned. **Forgot password?** sends a reset link. Sign-in and recovery errors use a muted red banner. Progress and confirmations use the app accent color.
 
 New account signup and couple codes are prepared. Enable `signupEnabled` in `sync-config.js` after applying the couple onboarding migration and verifying email delivery in the hosted environment. Existing accounts can sign in while signup is disabled.
 

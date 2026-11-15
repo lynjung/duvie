@@ -6,6 +6,7 @@ const goals = ['Our one-year plan', 'Retire by 30'];
 const key = 'duvie-v1';
 const sync = window.duvieSync;
 const nav = document.querySelector('.tab-bar');
+const shell = screen.closest('.shell');
 const syncMessage = document.createElement('p');
 syncMessage.className = 'sync-message';
 syncMessage.setAttribute('role', 'status');
@@ -481,74 +482,85 @@ const views = {
   settings: settingsView, couple: coupleView, troubleshooting: troubleshootingView, 'edit-profile': editProfileView, password: () => passwordView(false)
 };
 
+function authLayout(title, content, options) {
+  return `<div class="auth-flow">
+    ${pageHeading(title, options)}
+    <div data-auth-status></div>
+    ${content}
+  </div>`;
+}
+
 function passwordView(fromLink) {
-  return `${pageHeading(fromLink ? 'Set your password' : 'Set or change password', fromLink ? {} : {parent: 'Settings'})}
-    <div class="panel">
-      <form id="set-password" method="post">
-        <label>Email<input type="email" name="email" autocomplete="username" value="${esc(sessionEmail)}" readonly></label>
-        <label>New password<input type="password" name="password" autocomplete="new-password" minlength="12" maxlength="72" required></label>
-        <label>Confirm password<input type="password" name="confirmation" autocomplete="new-password" minlength="12" maxlength="72" required></label>
-        <p class="muted">Use at least 12 characters.</p>
-        <button class="primary">Save password</button>
-      </form>
-      ${fromLink ? '<button class="auth-option" data-skip-password>Skip for now</button>' : ''}
-    </div>`;
+  return authLayout(fromLink ? 'Set your password' : 'Set or change password', `
+    <form id="set-password" method="post">
+      <label>Email address<input type="email" name="email" autocomplete="username" value="${esc(sessionEmail)}" readonly></label>
+      <label>New password<input type="password" name="password" autocomplete="new-password" minlength="12" maxlength="72" aria-describedby="password-help" required></label>
+      <label>Confirm password<input type="password" name="confirmation" autocomplete="new-password" minlength="12" maxlength="72" required></label>
+      <p class="muted auth-hint" id="password-help">Use at least 12 characters.</p>
+      <button class="primary">Save password</button>
+    </form>
+    ${fromLink ? '<button class="auth-option" data-skip-password>Skip for now</button>' : ''}
+  `, fromLink ? undefined : {parent: 'Settings'});
 }
 
 function onboardingView() {
   const joining = onboardingMode === 'join-space';
-  return `${pageHeading(joining ? 'Join your partner' : 'Set up your space')}
-    <div class="panel">
-      <form id="space-setup" method="post">
-        <label>Your name<input name="displayName" autocomplete="given-name" maxlength="30" value="${esc(onboardingName)}" required></label>
-        ${joining ? '<label>Couple code<input name="coupleCode" autocapitalize="none" spellcheck="false" required></label>' : ''}
-        <button class="primary">${joining ? 'Join space' : 'Create a space'}</button>
-      </form>
-      <div class="auth-options">
-        <button data-onboarding-mode="${joining ? 'create-space' : 'join-space'}">${joining ? 'Create my own space' : 'I have a couple code'}</button>
-        <button data-sign-out>Sign out</button>
-      </div>
-    </div>`;
+  return authLayout(joining ? 'Join your partner' : 'Set up your space', `
+    <form id="space-setup" method="post">
+      <label>Your name<input name="displayName" autocomplete="given-name" maxlength="30" value="${esc(onboardingName)}" required></label>
+      ${joining ? '<label>Couple code<input name="coupleCode" autocapitalize="none" spellcheck="false" required></label>' : ''}
+      <button class="primary">${joining ? 'Join space' : 'Create a space'}</button>
+    </form>
+    <div class="auth-options">
+      <button data-onboarding-mode="${joining ? 'create-space' : 'join-space'}">${joining ? 'Create my own space' : 'I have a couple code'}</button>
+      <button data-sign-out>Sign out</button>
+    </div>
+  `);
 }
 
+const backToSignIn = '<button class="auth-option" data-auth-view="sign-in"><span aria-hidden="true">←</span> Back to sign in</button>';
+
 function connectionView() {
-  if (connection === 'loading') return '<h1>Connecting to Duvie…</h1>';
-  if (connection === 'error') return '<h1>Connection unavailable</h1><p>Refresh to try again.</p>';
+  if (connection === 'loading') return authLayout('Connecting to Duvie…', '');
+  if (connection === 'error') return authLayout('Connection unavailable', '<p>Refresh to try again.</p>');
   if (connection === 'unlinked') {
-    return sync.signupEnabled ? onboardingView() : `${pageHeading('Pairing pending')}
-      <div class="panel"><p>This account is waiting to be linked to a Duvie space.</p><button data-sign-out>Sign out</button></div>`;
+    return sync.signupEnabled ? onboardingView() : authLayout('Pairing pending', `
+      <p>This account is waiting to be linked to a Duvie space.</p>
+      <button class="auth-option" data-sign-out>Sign out</button>
+    `);
   }
   if (connection === 'password-setup') return passwordView(true);
   if (authView === 'confirm-email') {
-    return `${pageHeading('Check your email')}
-      <section class="panel">
-        <p>Open the confirmation link sent to <strong>${esc(authEmail)}</strong> to finish creating your account.</p>
-        <button class="auth-option" data-auth-view="sign-in">Back to sign in</button>
-      </section>`;
+    return authLayout('Check your email', `
+      <p>Open the confirmation link sent to <strong>${esc(authEmail)}</strong> to finish creating your account.</p>
+      ${backToSignIn}
+    `);
   }
 
   const passwordSignIn = authView === 'sign-in';
   const creating = authView === 'create-account';
   const title = passwordSignIn ? 'Sign in' : creating ? 'Create account' : 'Reset password';
   const submit = passwordSignIn || creating ? title : 'Send reset link';
-  return `${pageHeading(title)}
-    <div class="panel">
-      <form id="${authView}" method="post">
-        <label>Email address<input type="email" name="email" autocomplete="username" autocapitalize="none" value="${esc(authEmail)}" required></label>
-        ${passwordSignIn ? '<label>Password<input type="password" name="password" autocomplete="current-password" required></label>' : ''}
-        ${creating ? '<label>Password<input type="password" name="password" autocomplete="new-password" minlength="12" maxlength="72" aria-describedby="signup-password-help" required></label><p class="muted" id="signup-password-help">Use at least 12 characters.</p>' : ''}
-        <button class="primary">${submit}</button>
-      </form>
-      ${passwordSignIn ? `<div class="auth-options">
-        <button data-auth-view="password-link">Forgot password?</button>
-        ${sync.signupEnabled ? '<button data-auth-view="create-account">Create account</button>' : ''}
-      </div>` : '<button class="auth-option" data-auth-view="sign-in">Back to sign in</button>'}
-    </div>`;
+  return authLayout(title, `
+    <form id="${authView}" method="post">
+      <label>Email address<input type="email" name="email" autocomplete="username" autocapitalize="none" value="${esc(authEmail)}" required></label>
+      ${passwordSignIn ? '<label>Password<input type="password" name="password" autocomplete="current-password" required></label>' : ''}
+      ${creating ? '<label>Password<input type="password" name="password" autocomplete="new-password" minlength="12" maxlength="72" aria-describedby="password-help" required></label><p class="muted auth-hint" id="password-help">Use at least 12 characters.</p>' : ''}
+      <button class="primary">${submit}</button>
+    </form>
+    ${passwordSignIn ? `<div class="auth-options">
+      <button data-auth-view="password-link">Forgot password?</button>
+      ${sync.signupEnabled ? '<button data-auth-view="create-account">Create account</button>' : ''}
+    </div>` : backToSignIn}
+  `);
 }
 
 function render() {
   nav.hidden = Boolean(sync && connection !== 'ready');
+  shell.classList.toggle('auth-shell', nav.hidden);
+  if (screen.contains(syncMessage)) screen.before(syncMessage);
   screen.innerHTML = nav.hidden ? connectionView() : views[page]();
+  screen.querySelector('[data-auth-status]')?.replaceWith(syncMessage);
   const parent = {event: 'planner', checkin: 'nook', routines: 'goals', goal: 'goals',
     settings: 'profile', couple: 'profile', troubleshooting: 'profile', 'edit-profile': 'profile', password: 'profile'}[page] || page;
   document.querySelectorAll('nav button').forEach((button) => {

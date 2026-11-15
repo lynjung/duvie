@@ -650,6 +650,60 @@ textarea { resize: vertical; }
 .edit-profile .error:empty { display: none; }
 .edit-profile button:disabled { opacity: .55; cursor: default; }
 
+.auth-flow {
+  width: min(100%, 336px);
+  margin-inline: auto;
+  overflow-wrap: anywhere;
+}
+
+.auth-shell { max-width: none; }
+
+.auth-shell .app-header {
+  display: flex;
+  justify-content: center;
+  padding-block: calc(env(safe-area-inset-top) + clamp(32px, 9svh, 80px)) clamp(24px, 4svh, 36px);
+  border-bottom: 0;
+}
+
+.auth-shell .wordmark { font-size: 1.875rem; }
+.auth-shell .wordmark img { width: 64px; height: 48px; }
+.auth-shell main { padding-block-start: 0; }
+
+.auth-flow .page-heading { margin-bottom: 24px; }
+
+.auth-flow h1 {
+  font-size: 1.75rem;
+  font-weight: 575;
+}
+
+.auth-flow form {
+  gap: 16px;
+  margin-top: 0;
+}
+
+.auth-flow label {
+  gap: 6px;
+  font-weight: 550;
+}
+
+.auth-flow input {
+  min-height: 50px;
+  padding-inline: 12px;
+  border-radius: 12px;
+}
+
+.auth-flow input[readonly] { background: #f4eee5; }
+
+.auth-flow .primary {
+  min-height: 50px;
+  margin-top: 4px;
+  border-radius: 12px;
+}
+
+.auth-flow .auth-hint { margin-top: -8px; }
+
+.auth-flow .sync-message { margin: 0 0 16px; }
+
 .auth-options {
   display: flex;
   flex-wrap: wrap;
@@ -663,6 +717,7 @@ textarea { resize: vertical; }
 }
 
 .auth-options, .auth-option { margin-top: 8px; }
+.auth-option span { margin-inline-end: 4px; }
 
 .couple-code {
   display: grid;
