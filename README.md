@@ -41,9 +41,9 @@ Use **Sign in** with your existing email address and password. **Forgot password
 
 New account signup and couple codes are prepared. Enable `signupEnabled` in `sync-config.js` after applying the couple onboarding migration and verifying email delivery in the hosted environment. Existing accounts can sign in while signup is disabled.
 
-Hosted sign-up and password recovery need an [email sender configured in Supabase](https://supabase.com/docs/guides/auth/auth-smtp) for addresses outside the project team.
+Supabase’s default sender handles password recovery during testing. To send account emails as **Duvie Team** and reach users outside the project team, connect an email provider through [Supabase Custom SMTP](https://supabase.com/docs/guides/auth/auth-smtp) and set the sender name there.
 
-Duvie keeps your session in the browser that completed sign-in. Each browser, website address, or private browsing session can require its own sign-in. In an ordinary Safari tab, reopening Duvie should restore your session, and Safari can autofill your saved password when sign-in is needed.
+Duvie keeps your session in the browser that completed sign-in. Each browser, website address, or private browsing session can require its own sign-in. Open a password reset link in the browser you want to use for Duvie. The session is saved in that browser.
 
 ## Profile photos
 

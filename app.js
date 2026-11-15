@@ -634,7 +634,6 @@ async function submitAuth(form, data, submit) {
     if (id === 'sign-in') {
       report('Signing in…');
       const session = await sync.signIn(email, password);
-      // Safari can offer to save or autofill credentials from the password form.
       await showSession(session);
     } else if (id === 'create-account') {
       report('Creating your account…');
@@ -662,7 +661,7 @@ async function submitAuth(form, data, submit) {
       report('Sending email…');
       await sync.sendPasswordLink(email);
       if (version === connectionVersion) {
-        report('If this email can receive Duvie links, one should arrive shortly. Open it in Safari.');
+        report('Check your email for a reset link. Open it in the browser you use for Duvie.');
       }
     }
   } catch (error) {
