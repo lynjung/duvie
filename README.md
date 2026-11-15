@@ -10,7 +10,7 @@ A cozy app for couples to organize schedules, track daily routines, reflect toge
 - **Goals** brings daily routine logging, individual and combined commitment, and goal milestones together.
 - **Profile** shows the two linked accounts and their profile photos. Use the gear to open Settings. Manual sync lives under **Settings → Troubleshooting**.
 - Weekly check-ins and an interactive otter companion.
-- A responsive layout for phones and desktop browsers.
+- A shared mobile layout for Nook, Planner, Goals, and Profile with consistent margins, readable headings, and a bottom tab bar that stays visible while scrolling.
 
 ## Run locally
 

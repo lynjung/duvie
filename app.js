@@ -98,10 +98,16 @@ function pageHeading(title, { parent, subtitle } = {}) {
   </div>`;
 }
 
+function routineTally(day) {
+  return {
+    done: partners().reduce((total, partner) => total + countRoutines(day, partner), 0),
+    due: habits.length * partners().length
+  };
+}
+
 function dailyCommitment(day = routineDate) {
   if (day > today()) return 'Routines open on this day.';
-  const done = partners().reduce((total, partner) => total + countRoutines(day, partner), 0);
-  const due = habits.length * partners().length;
+  const {done, due} = routineTally(day);
   return `${done} of ${due} routines · ${percentage(done, due)}%`;
 }
 
@@ -172,12 +178,12 @@ function plannerCalendar(days, currentMonth) {
   return `<div class="week${fullMonth ? ' month' : ''}" role="group" aria-label="Select a day">${headers}${cells}</div>`;
 }
 
-function eventRows(events) {
-  return `<div class="event-list">${events.map((event) => `<div class="row event">
+function eventRows(events, {editable = false} = {}) {
+  return `<ul class="event-list">${events.map((event) => `<li class="row event${editable ? '' : ' schedule-preview'}">
     <time class="muted" datetime="${esc(event.start)}">${time(event.start)}</time>
-    <span>${esc(event.title)}<small>${esc(event.owner)}${event.end ? ' · until ' + time(event.end) : ''}</small></span>
-    <button data-edit="${esc(event.id)}" aria-label="Edit ${esc(event.title)}">Edit</button>
-  </div>`).join('')}</div>`;
+    <span><strong>${esc(event.title)}</strong><small>${esc(event.owner)}${editable && event.end ? ' · until ' + time(event.end) : ''}</small></span>
+    ${editable ? `<button data-edit="${esc(event.id)}" aria-label="Edit ${esc(event.title)}">Edit</button>` : ''}
+  </li>`).join('')}</ul>`;
 }
 
 function plannerView() {
@@ -198,22 +204,24 @@ function plannerView() {
     <div class="planner-modes" role="group" aria-label="Calendar view">
       ${plannerModes.map((mode) => `<button data-mode="${mode}" aria-pressed="${mode === plannerMode}">${mode}</button>`).join('')}
     </div>
-    <div class="panel calendar">
-      <div class="calendar-controls planner-controls" role="group" aria-label="Browse calendar">
-        <button data-period="-1" aria-label="Previous ${plannerMode.toLowerCase()}">←</button>
-        <p>${plannerPeriod(selected, weekDays)}</p>
-        <button data-planner-today>Today</button>
-        <button data-period="1" aria-label="Next ${plannerMode.toLowerCase()}">→</button>
+    <section class="content-section planner-calendar" aria-label="Calendar">
+      <div class="planner-controls" role="group" aria-label="Browse calendar">
+        <h2>${plannerPeriod(selected, weekDays)}</h2>
+        <div class="period-actions">
+          <button class="text-action" data-planner-today>Today</button>
+          <button data-period="-1" aria-label="Previous ${plannerMode.toLowerCase()}">←</button>
+          <button data-period="1" aria-label="Next ${plannerMode.toLowerCase()}">→</button>
+        </div>
       </div>
       ${plannerCalendar(calendarDays, month)}
-    </div>
-    <section class="panel">
-      <div class="heading"><h2>${weekly ? 'Week’s events' : longDate(plannerDate)}</h2>
+    </section>
+    <section class="content-section">
+      <div class="heading"><h2>${weekly ? 'Week’s events' : plannerMode === 'Day' ? 'Events' : longDate(plannerDate)}</h2>
         <button class="action" data-go="event" aria-label="Add event for ${longDate(plannerDate)}">+ Add event</button>
       </div>
       ${agenda.length ? agenda.map(({day, events}) => `<div class="agenda-day">
         ${weekly ? `<h3>${longDate(day)}</h3>` : ''}
-        ${eventRows(events)}
+        ${eventRows(events, {editable: true})}
       </div>`).join('') : `<p class="muted">Nothing scheduled for this ${weekly ? 'week' : 'day'}.</p>`}
     </section>`;
 }
@@ -251,17 +259,22 @@ function nookView() {
   const day = today();
   const events = dayEvents(day);
   return `${pageHeading('Nook', { subtitle: longDate(day) })}
-  <section class="panel">
-    <div class="heading"><h2>Today’s schedule</h2><button class="action" data-go="planner">Open planner</button></div>
-    ${events.length ? `<div class="event-list">${events.slice(0, 2).map((event) => `<div class="row event schedule-preview">
-      <time class="muted" datetime="${esc(event.start)}">${time(event.start)}</time>
-      <span>${esc(event.title)}<small>${esc(event.owner)}</small></span>
-    </div>`).join('')}</div>` : '<p class="muted">Nothing on the schedule today.</p>'}
+  <section class="feature-panel nook-pet">
+    <button class="pet${count ? ' learned' : ''}" data-pat>
+      <img src="nook-otter.png" alt="Otter floating with a stone" width="1774" height="887">
+      Tap to say hi
+    </button>
+    <p class="muted" id="pet-note" aria-live="polite">${count ? `${count} shared check-in${count === 1 ? '' : 's'} · Stone trick learned` : 'Finish a check-in together to teach your otter a stone trick.'}</p>
+  </section>
+  <section class="content-section">
+    <div class="heading"><h2>Today’s schedule</h2><button class="text-action" data-go="planner">Open planner</button></div>
+    ${events.length ? eventRows(events.slice(0, 2)) : '<p class="muted">Nothing on the schedule today.</p>'}
     ${events.length > 2 ? `<p class="muted schedule-more">+${events.length - 2} more on the schedule</p>` : ''}
   </section>
-  <section class="panel nook-pet"><button class="pet${count ? " learned" : ""}" data-pat><img src="nook-otter.png" alt="Otter floating with a stone">Tap to say hi</button>
-  <p class="muted" id="pet-note" aria-live="polite">${count ? `${count} shared check-in${count === 1 ? '' : 's'} · Stone trick learned` : 'Finish a check-in together to teach your otter a stone trick.'}</p></section>
-  <section class="panel"><h2>Weekly check-in</h2><div class="row"><span>What helped us this week?</span><button class="action" data-go="checkin">Open</button></div></section>`;
+  <section class="content-section">
+    <div class="heading"><h2>Weekly check-in</h2><button class="text-action" data-go="checkin" aria-label="Open weekly check-in">Open</button></div>
+    <p class="muted">What helped us this week?</p>
+  </section>`;
 }
 
 function checkinView() {
@@ -338,19 +351,23 @@ function goalView() {
 }
 
 function goalsView() {
+  const {done, due} = routineTally(today());
   return `${pageHeading('Goals')}
-    <section class="panel">
-      <div class="heading"><div><h2>Daily routines</h2><p class="muted">Today · ${dailyCommitment(today())}</p></div>
+    <section class="content-section">
+      <div class="heading"><h2>Daily routines</h2>
         <button class="action" data-go="routines">Log routines</button>
       </div>
+      <p class="muted">Today · ${done} of ${due} done</p>
+      <progress class="routine-progress" value="${done}" max="${due}" aria-label="Today’s routine progress"></progress>
     </section>
-    <section class="panel"><h2>Our one-year plan</h2><p>Target · over 90%</p>
-      <p class="muted">Commitment through yesterday</p>${progressView()}
-      <button class="action" data-goal="0">Open plan</button>
+    <section class="content-section">
+      <div class="heading"><h2>Our one-year plan</h2><button class="text-action" data-goal="0">Open plan</button></div>
+      <p class="muted">Target over 90% · Through yesterday</p>
+      ${progressView()}
     </section>
-    <section class="panel"><h2>Retire by 30</h2>
-      <p class="muted goal-summary">${esc(state.milestones[1].find((item) => !item.done)?.title || 'Choose your next milestone together.')}</p>
-      <button class="action" data-goal="1">Open goal</button>
+    <section class="content-section">
+      <div class="heading"><h2>Retire by 30</h2><button class="text-action" data-goal="1">Open goal</button></div>
+      <p class="muted">${esc(state.milestones[1].find((item) => !item.done)?.title || 'Choose your next milestone together.')}</p>
     </section>`;
 }
 
@@ -374,7 +391,7 @@ function profileView() {
       </svg>
     </button>
   </div>
-  <section class="panel couple-profile">
+  <section class="feature-panel couple-profile" aria-label="Couple profile">
     <div class="couple-portraits">
       ${people.map((name) => `<div class="couple-person">
         ${profileAvatar(name)}
@@ -386,10 +403,12 @@ function profileView() {
       ${people.filter(canEdit).map((name) => `<button class="action" data-profile-for="${esc(name)}">${sync ? 'Edit your profile' : 'Edit ' + esc(name) + '’s photo'}</button>`).join('')}
     </div>
   </section>
-  ${sync ? `<button class="panel profile-link" data-go="couple">
-    <span><strong>Couple connection</strong><small>${people.length === 2 ? 'Connected' : 'Waiting for your partner'}</small></span>
-    <span class="profile-chevron" aria-hidden="true">›</span>
-  </button>` : '<p class="muted profile-local">Profiles are saved in this browser.</p>'}`;
+  ${sync ? `<div class="content-section">
+    <button class="profile-link couple-connection" data-go="couple">
+      <span><strong>Couple connection</strong><small>${people.length === 2 ? 'Connected' : 'Waiting for your partner'}</small></span>
+      <span class="profile-chevron" aria-hidden="true">›</span>
+    </button>
+  </div>` : '<p class="muted profile-local">Profiles are saved in this browser.</p>'}`;
 }
 
 function settingsView() {
