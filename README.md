@@ -37,9 +37,9 @@ Duvie is under active development. The local checkout is configured for Supabase
 
 ## Sign in
 
-Use **Create account** with your email address and password, then confirm your email once. Returning users use **Sign in**. **Forgot password?** sends a reset link.
+Use **Sign in** with your existing email address and password. **Forgot password?** sends a reset link.
 
-After signing up, start a private space or join your partner with their couple code. To share a code, go to **Profile → Couple connection**. Codes are single-use and expire after 24 hours. Existing accounts go directly to their shared space when they sign in.
+New account signup and couple codes are prepared. Enable `signupEnabled` in `sync-config.js` after applying the couple onboarding migration and verifying email delivery in the hosted environment. Existing accounts can sign in while signup is disabled.
 
 Hosted sign-up and password recovery need an [email sender configured in Supabase](https://supabase.com/docs/guides/auth/auth-smtp) for addresses outside the project team.
 

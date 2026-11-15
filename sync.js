@@ -1,5 +1,5 @@
 (() => {
-  const {url, publishableKey} = window.duvieSyncConfig;
+  const {url, publishableKey, signupEnabled = false} = window.duvieSyncConfig;
   if (!url && !publishableKey) return;
 
   let client;
@@ -29,6 +29,7 @@
   }
 
   window.duvieSync = {
+    signupEnabled,
     async connect() {
       if (!url || !publishableKey.startsWith('sb_publishable_') || new URL(url).protocol !== 'https:') {
         throw new Error('Set the Supabase HTTPS project URL and publishable key.');
@@ -93,7 +94,7 @@
         read(tables.milestones, spaceId, ['created_at', 'id']),
         read(tables.answers, spaceId, ['author_id', 'week_start']),
         read(tables.profilePhotos, spaceId, ['member_id']),
-        client.from('duvie_spaces').select('plan_start').eq('id', spaceId).single().then(rows)
+        signupEnabled ? client.from('duvie_spaces').select('plan_start').eq('id', spaceId).single().then(rows) : null
       ]);
       const names = Object.fromEntries(members.map(({user_id, name}) => [user_id, name]));
       const logs = {};
@@ -113,7 +114,7 @@
         events: events.map(({id, day, title, starts, ends, owner}) =>
           ({id, date: day, title, start: starts.slice(0, 5), end: ends?.slice(0, 5) || '', owner})),
         logs, milestones: byGoal, answers: weekly,
-        planStart: space.plan_start,
+        ...(space ? {planStart: space.plan_start} : {}),
         spaceMembers: members.map(({name}) => name),
         profilePhotos: Object.fromEntries(photos.map(({member_id, photo}) => [names[member_id], photo]))
       };

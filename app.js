@@ -416,8 +416,8 @@ function coupleView() {
   const partner = state.spaceMembers.find((name) => name !== member.name);
   return `${pageHeading('Couple connection', {parent: 'Profile'})}
     <section class="panel"><h2>${partner ? 'Connected' : 'Waiting for your partner'}</h2>
-      <p class="muted">${partner ? `You and ${esc(partner)} share this Duvie space.` : 'Ask your partner to create an account and enter a couple code.'}</p>
-      ${partner ? '' : `<button class="action" data-couple-code>${coupleCode ? 'Generate a new code' : 'Get a couple code'}</button>
+      <p class="muted">${partner ? `You and ${esc(partner)} share this Duvie space.` : (sync.signupEnabled ? 'Ask your partner to create an account and enter a couple code.' : 'Your partner’s account can be linked to this Duvie space.')}</p>
+      ${partner || !sync.signupEnabled ? '' : `<button class="action" data-couple-code>${coupleCode ? 'Generate a new code' : 'Get a couple code'}</button>
         ${coupleCode ? `<label class="couple-code">Couple code<input readonly value="${esc(coupleCode)}" aria-describedby="couple-code-help"></label>
           <button data-copy-couple-code>Copy code</button><p class="muted" id="couple-code-help">Share privately with your partner. The code can be used once and expires in 24 hours.</p>` : ''}`}
     </section>`;
@@ -511,12 +511,15 @@ function onboardingView() {
 function connectionView() {
   if (connection === 'loading') return '<h1>Connecting to Duvie…</h1>';
   if (connection === 'error') return '<h1>Connection unavailable</h1><p>Refresh to try again.</p>';
-  if (connection === 'unlinked') return onboardingView();
+  if (connection === 'unlinked') {
+    return sync.signupEnabled ? onboardingView() : `${pageHeading('Pairing pending')}
+      <div class="panel"><p>This account is waiting to be linked to a Duvie space.</p><button data-sign-out>Sign out</button></div>`;
+  }
   if (connection === 'password-setup') return passwordView(true);
   if (authView === 'confirm-email') {
     return `${pageHeading('Check your email')}
       <section class="panel">
-        <p>Open the confirmation link sent to <strong>${esc(authEmail)}</strong>, to finish creating your account.</p>
+        <p>Open the confirmation link sent to <strong>${esc(authEmail)}</strong> to finish creating your account.</p>
         <button class="auth-option" data-auth-view="sign-in">Back to sign in</button>
       </section>`;
   }
@@ -535,7 +538,7 @@ function connectionView() {
       </form>
       ${passwordSignIn ? `<div class="auth-options">
         <button data-auth-view="password-link">Forgot password?</button>
-        <button data-auth-view="create-account">Create account</button>
+        ${sync.signupEnabled ? '<button data-auth-view="create-account">Create account</button>' : ''}
       </div>` : '<button class="auth-option" data-auth-view="sign-in">Back to sign in</button>'}
     </div>`;
 }
