@@ -40,10 +40,13 @@ const save = () => {
 };
 const canEdit = (partner) => !sync || member?.name === partner;
 
-function report(message) {
+function report(message, {error = false} = {}) {
+  syncMessage.classList.toggle('sync-message-error', error);
   syncMessage.textContent = message;
   syncMessage.hidden = !message;
 }
+
+const reportError = (message) => report(message, {error: true});
 
 async function storeChange(table, action, values, id) {
   if (!sync) return true;
@@ -59,7 +62,7 @@ async function storeChange(table, action, values, id) {
     report('');
     return true;
   } catch {
-    if (connectionVersion === version) report('Could not confirm the save. Go to Profile → Settings → Troubleshooting to refresh, then try again.');
+    if (connectionVersion === version) reportError('Could not confirm the save. Go to Profile → Settings → Troubleshooting to refresh, then try again.');
     return false;
   } finally {
     saving = false;
@@ -606,7 +609,7 @@ async function finishPasswordSetup() {
   try {
     await showSession(await sync.getSession(), {continueSetup: true});
   } catch {
-    report('Could not finish signing in. Reload Duvie to try again.');
+    reportError('Could not finish signing in. Reload Duvie to try again.');
   }
 }
 
@@ -616,9 +619,9 @@ async function submitAuth(form, data, submit) {
   const email = data.email.trim();
   const password = data.password;
   if (id === 'set-password' || id === 'create-account') {
-    if (id === 'set-password' && password !== data.confirmation) return report('The passwords don’t match.');
+    if (id === 'set-password' && password !== data.confirmation) return reportError('The passwords don’t match.');
     if (password.length < 12 || new TextEncoder().encode(password).length > 72) {
-      return report('Use 12 to 72 characters. Some symbols and emoji take more space.');
+      return reportError('Use 12 to 72 characters. Some symbols and emoji take more space.');
     }
   }
 
@@ -666,12 +669,12 @@ async function submitAuth(form, data, submit) {
     if (version !== connectionVersion) return;
     const code = error?.code;
     if (code === 'over_email_send_rate_limit' || code === 'over_request_rate_limit') {
-      report('Too many attempts. Wait a little, then try again.');
+      reportError('Too many attempts. Wait a little, then try again.');
     } else if (code === 'email_address_not_authorized') {
-      report('Duvie couldn’t send an email to this address. Please try again later.');
+      reportError('Duvie couldn’t send an email to this address. Please try again later.');
     } else if (id === 'sign-in') {
-      report(code === 'invalid_credentials' || code === 'email_not_confirmed'
-        ? 'Couldn’t sign in. Check your email and password, or use Forgot password.'
+      reportError(code === 'invalid_credentials' || code === 'email_not_confirmed'
+        ? 'Couldn’t sign in with that email and password. Try again or tap Forgot password?'
         : 'Couldn’t connect to sign in. Try again in a moment.');
     } else if (id === 'create-account') {
       if (code === 'user_already_exists' || code === 'email_exists') {
@@ -680,20 +683,20 @@ async function submitAuth(form, data, submit) {
         render();
         report('Try signing in, or use Forgot password to recover your account.');
       } else if (code === 'weak_password') {
-        report('Choose a stronger password.');
+        reportError('Choose a stronger password.');
       } else {
-        report('Couldn’t create your account. Check your email and try again.');
+        reportError('Couldn’t create your account. Check your email and try again.');
       }
     } else if (id === 'set-password') {
       if (code === 'reauthentication_needed' || code === 'session_not_found') {
-        report('Duvie needs a fresh sign-in. Sign out, then use Forgot password.');
+        reportError('Duvie needs a fresh sign-in. Sign out, then use Forgot password.');
       } else if (code === 'weak_password' || code === 'same_password') {
-        report('Choose a stronger password you haven’t used for Duvie before.');
+        reportError('Choose a stronger password you haven’t used for Duvie before.');
       } else {
-        report('Couldn’t save your password. Try again in a moment.');
+        reportError('Couldn’t save your password. Try again in a moment.');
       }
     } else {
-      report('Couldn’t send the email. Check your address and try again.');
+      reportError('Couldn’t send the email. Check your address and try again.');
     }
   } finally {
     authBusy = false;
@@ -708,8 +711,8 @@ async function submitSpace(form) {
   const data = new FormData(form);
   const name = data.get('displayName').trim();
   const code = data.get('coupleCode')?.replace(/[\s-]/g, '').toLowerCase() ?? null;
-  if (!name || name.toLowerCase() === 'together') return report('Choose a name to display in Duvie.');
-  if (code !== null && !/^[a-f0-9]{32}$/.test(code)) return report('Enter the full couple code from your partner.');
+  if (!name || name.toLowerCase() === 'together') return reportError('Choose a name to display in Duvie.');
+  if (code !== null && !/^[a-f0-9]{32}$/.test(code)) return reportError('Enter the full couple code from your partner.');
   authBusy = true;
   screen.inert = true;
   const version = connectionVersion;
@@ -721,8 +724,8 @@ async function submitSpace(form) {
     if (version === connectionVersion) await showSession(session, {continueSetup: true});
   } catch (error) {
     if (version !== connectionVersion) return;
-    if (error?.code === 'P0001') report(error.message);
-    else report('Couldn’t set up your space. Try again.');
+    if (error?.code === 'P0001') reportError(error.message);
+    else reportError('Couldn’t set up your space. Try again.');
   } finally {
     authBusy = false;
     screen.inert = false;
@@ -748,7 +751,7 @@ async function refreshShared(manual = false) {
     render();
     if (manual) screen.querySelector('[data-refresh]')?.focus({preventScroll: true});
   } catch {
-    if (version === connectionVersion) report('Could not refresh. Try again in Profile → Settings → Troubleshooting.');
+    if (version === connectionVersion) reportError('Could not refresh. Try again in Profile → Settings → Troubleshooting.');
   } finally {
     refreshing = false;
   }
@@ -783,7 +786,7 @@ document.addEventListener('click', async (event) => {
       await showSession(null);
     } catch {
       button.disabled = false;
-      report('Could not sign out. Try again.');
+      reportError('Could not sign out. Try again.');
     }
     return;
   }
@@ -813,7 +816,7 @@ document.addEventListener('click', async (event) => {
       coupleCode = code;
       if (page === 'couple') render();
     } catch {
-      if (version === connectionVersion) report('Couldn’t create a code. Refresh shared data and try again.');
+      if (version === connectionVersion) reportError('Couldn’t create a code. Refresh shared data and try again.');
     } finally {
       button.disabled = false;
     }
@@ -1008,11 +1011,11 @@ if (sync) {
   sync.connect().then(async ({session, setupPassword, linkFailed}) => {
     sync.onSessionChange(showSession);
     await showSession(session, {setupPassword});
-    if (linkFailed && !session) report('This email link is expired or already used. Request a new one below.');
+    if (linkFailed && !session) reportError('This email link is expired or already used. Request a new one below.');
   }).catch(() => {
     connection = 'error';
     render();
-    report('Check the Supabase project URL and publishable key, then refresh.');
+    reportError('Check the Supabase project URL and publishable key, then refresh.');
   });
 
   document.addEventListener('visibilitychange', () => {

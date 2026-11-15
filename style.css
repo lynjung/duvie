@@ -10,6 +10,7 @@
   --line: #e6ddd2;
   --muted: #68615a;
   --error: #932f24;
+  --error-soft: #fae9e5;
   --gutter: clamp(16px, 5.5vw, 24px);
   --radius: 16px;
   --tap: 44px;
@@ -525,6 +526,11 @@ textarea { resize: vertical; }
   background: var(--accent-soft);
   color: var(--accent);
   font-size: .875rem;
+}
+
+.sync-message-error {
+  background: var(--error-soft);
+  color: var(--error);
 }
 
 .profile-heading {
