@@ -1,5 +1,6 @@
 const screen = document.querySelector('#screen');
-const partners = ['Lyn', 'Edison'];
+const localPartners = ['Lyn', 'Edison'];
+const partners = () => sync ? state.spaceMembers : localPartners;
 const habits = ['Wake by 7 a.m.', 'Work out', 'Share morning schedule', 'Phone-free first 30 minutes', 'Read 30 minutes', 'Sleep at least 7 hours', 'Reflect or journal', 'Work on career goal'];
 const goals = ['Our one-year plan', 'Retire by 30'];
 const key = 'duvie-v1';
@@ -16,11 +17,14 @@ let sessionEmail = '';
 let authView = 'sign-in';
 let authEmail = '';
 let authBusy = false;
+let onboardingMode = 'create-space';
+let onboardingName = '';
+let coupleCode = '';
 let connection = sync ? 'loading' : 'local';
 let connectionVersion = 0;
 let saving = false;
 let refreshing = false;
-const state = { events: [], logs: {}, answers: {}, milestones: [[], []], spaceMembers: [], profilePhotos: {} };
+const state = { events: [], logs: {}, answers: {}, milestones: [[], []], spaceMembers: [], profilePhotos: {}, planStart: '2026-11-08' };
 if (!sync) Object.assign(state, JSON.parse(localStorage.getItem(key) || '{}'));
 
 const localDate = (date) => [date.getFullYear(), date.getMonth() + 1, date.getDate()]
@@ -73,13 +77,14 @@ let goal = 0;
 let answerAuthor = null;
 let profilePartner = null;
 let draftPhoto = null;
-const routineLog = (day, partner) => state.logs[day]?.[partner] || {};
+const routineLog = (day, partner) => Object.hasOwn(state.logs[day] ?? {}, partner) ? state.logs[day][partner] : {};
 function countRoutines(day, partner) {
   const log = routineLog(day, partner);
   return habits.reduce((count, _, index) => count + Number(Boolean(log[index])), 0);
 }
 const percentage = (done, due) => Math.round(done * 100 / due);
-const currentAnswers = () => state.answers[week()] || {};
+const currentAnswers = () => Object.assign(Object.create(null), state.answers[week()]);
+const hasSharedAnswers = (answers) => partners().length === 2 && partners().every((partner) => Object.hasOwn(answers, partner));
 const time = (value) => new Date('2000-01-01T' + value).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
 function pageHeading(title, { parent, subtitle } = {}) {
   return `<div class="page-heading">
@@ -91,8 +96,8 @@ function pageHeading(title, { parent, subtitle } = {}) {
 
 function dailyCommitment(day = routineDate) {
   if (day > today()) return 'Routines open on this day.';
-  const done = partners.reduce((total, partner) => total + countRoutines(day, partner), 0);
-  const due = habits.length * partners.length;
+  const done = partners().reduce((total, partner) => total + countRoutines(day, partner), 0);
+  const due = habits.length * partners().length;
   return `${done} of ${due} routines · ${percentage(done, due)}%`;
 }
 
@@ -101,10 +106,10 @@ function routineTable() {
   return `<section class="panel">
     <h2 id="routine-title">Daily routines</h2>
     <table class="routine-table" aria-labelledby="routine-title">
-      <thead><tr><th scope="col">Routine</th>${partners.map((partner) => `<th scope="col">${partner}</th>`).join('')}</tr></thead>
+      <thead><tr><th scope="col">Routine</th>${partners().map((partner) => `<th scope="col">${esc(partner)}</th>`).join('')}</tr></thead>
       <tbody>${habits.map((habit, index) => `<tr><th scope="row">${habit}</th>
-        ${partners.map((partner) => `<td><label class="routine-toggle">
-          <input type="checkbox" data-habit="${index}" data-partner="${partner}" aria-label="${partner}: ${habit}"
+        ${partners().map((partner) => `<td><label class="routine-toggle">
+          <input type="checkbox" data-habit="${index}" data-partner="${esc(partner)}" aria-label="${esc(partner)}: ${habit}"
             ${routineLog(routineDate, partner)[index] ? 'checked' : ''} ${future || !canEdit(partner) ? 'disabled' : ''}>
         </label></td>`).join('')}</tr>`).join('')}</tbody>
     </table>
@@ -230,7 +235,7 @@ function eventView() {
   <div class="times"><label>Starts<input name="start" type="time" required value="${event?.start || ''}"></label><label><span>Ends <small>optional</small></span><input name="end" type="time" value="${event?.end || ''}"></label></div>
   <label>For<select name="owner" required>
     <option value="" disabled ${event ? '' : 'selected'}>Choose who this is for</option>
-    ${[...partners, 'Together'].map((owner) => `<option ${owner === event?.owner ? 'selected' : ''}>${owner}</option>`).join('')}
+    ${[...partners(), 'Together'].map((owner) => `<option ${owner === event?.owner ? 'selected' : ''}>${esc(owner)}</option>`).join('')}
   </select></label>
   <button class="primary">Save event</button><p class="error" role="alert" id="error"></p></form>
   ${event ? '<button class="danger" data-delete>Delete event</button>' : ''}
@@ -238,7 +243,7 @@ function eventView() {
 }
 
 function nookView() {
-  const count = Object.values(state.answers).filter((answers) => answers.Lyn && answers.Edison).length;
+  const count = Object.values(state.answers).filter((answers) => hasSharedAnswers(answers)).length;
   const day = today();
   const events = dayEvents(day);
   return `${pageHeading('Nook', { subtitle: longDate(day) })}
@@ -257,36 +262,48 @@ function nookView() {
 
 function checkinView() {
   const answers = currentAnswers();
-  const shared = partners.every((partner) => answers[partner]);
+  const shared = hasSharedAnswers(answers);
   return `${pageHeading('Weekly check-in', { parent: 'Nook' })}
     <section class="panel"><h2>What helped us this week?</h2>
     <p class="muted">${shared ? 'You’ve both answered.' : 'Answers appear here once both of you have shared.'}</p>
-    ${partners.map((partner) => `<div class="checkin-person"><div class="row">
-      <strong>${partner}</strong>
-      ${canEdit(partner) ? `<button data-answer-for="${partner}" aria-label="${answers[partner] ? 'Edit' : 'Write'} ${partner}’s answer">${answers[partner] ? 'Edit answer' : 'Write answer'}</button>` : ''}
+    ${partners().map((partner) => `<div class="checkin-person"><div class="row">
+      <strong>${esc(partner)}</strong>
+      ${canEdit(partner) ? `<button data-answer-for="${esc(partner)}" aria-label="${answers[partner] ? 'Edit' : 'Write'} ${esc(partner)}’s answer">${answers[partner] ? 'Edit answer' : 'Write answer'}</button>` : ''}
     </div>
     ${shared ? `<p class="checkin-answer">${esc(answers[partner])}</p>` : (answers[partner] ? '<p class="muted">Answer shared</p>' : '')}
-    ${answerAuthor === partner ? `<form id="checkin" data-author="${partner}">
-      <label>${partner}’s answer<textarea name="answer" required rows="5" maxlength="1500">${esc(answers[partner] || '')}</textarea></label>
+    ${answerAuthor === partner ? `<form id="checkin" data-author="${esc(partner)}">
+      <label>${esc(partner)}’s answer<textarea name="answer" required rows="5" maxlength="1500">${esc(answers[partner] || '')}</textarea></label>
       <button class="primary">${answers[partner] ? 'Update answer' : 'Share answer'}</button>
       <p class="error" role="alert" id="error"></p>
     </form>` : ''}</div>`).join('')}</section>`;
 }
 
+function planEnd() {
+  const day = new Date(state.planStart + 'T12:00:00');
+  const year = day.getFullYear() + 1;
+  const month = day.getMonth();
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return localDate(new Date(year, month, Math.min(day.getDate(), lastDay)));
+}
+
+function planDate(value) {
+  return new Date(value + 'T12:00:00').toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
+}
+
 function progressView() {
-  const first = '2026-11-08';
-  const last = '2027-11-08';
+  const first = state.planStart;
+  const last = planEnd();
   const end = [today(), localDate(offset(new Date(last + 'T12:00:00'), 1))].sort()[0];
   const days = Math.max(0, (Date.parse(end) - Date.parse(first)) / 86400000);
   if (!days) return '<p class="muted">Progress starts after the first day of the plan.</p>';
 
   const scoredDays = Object.keys(state.logs).filter((day) => day >= first && day < end);
   const due = days * habits.length;
-  const scores = partners.map((partner) => scoredDays.reduce((total, day) => total + countRoutines(day, partner), 0));
+  const scores = partners().map((partner) => scoredDays.reduce((total, day) => total + countRoutines(day, partner), 0));
   const combined = scores.reduce((total, score) => total + score, 0);
   return `<dl class="commitment-scores">
-    ${partners.map((partner, index) => `<div><dt>${partner}</dt><dd>${percentage(scores[index], due)}%</dd></div>`).join('')}
-    <div><dt>Together</dt><dd>${percentage(combined, due * partners.length)}%</dd></div>
+    ${partners().map((partner, index) => `<div><dt>${esc(partner)}</dt><dd>${percentage(scores[index], due)}%</dd></div>`).join('')}
+    <div><dt>Together</dt><dd>${percentage(combined, due * partners().length)}%</dd></div>
   </dl>`;
 }
 
@@ -296,9 +313,9 @@ function goalView() {
   const plant = `<span class="plant" role="img" aria-label="${completeCount} milestones complete">${completeCount ? '✿' : '♧'}</span>`;
   return `${pageHeading(goals[goal] + ' ' + plant, {
     parent: 'Goals',
-    subtitle: goal === 0 ? 'Through Nov 8, 2027 · Target over 90%' : ''
+    subtitle: goal === 0 ? `Through ${planDate(planEnd())} · Target over 90%` : ''
   })}
-  ${goal === 0 ? `<section class="panel"><h2>Habit progress</h2><p class="muted">All routines due from Nov 8, 2026 through yesterday, up to the end of the plan.</p>${progressView()}</section>` : ''}
+  ${goal === 0 ? `<section class="panel"><h2>Habit progress</h2><p class="muted">All routines due from ${planDate(state.planStart)} through yesterday, up to the end of the plan.</p>${progressView()}</section>` : ''}
   <section class="panel"><h2>Next milestones</h2>
     ${milestones.map((item, i) => item.done ? '' : `<div class="row milestone">
       <span>${esc(item.title)}</span><button data-complete="${i}">Mark complete</button>
@@ -343,7 +360,7 @@ function profileAvatar(name, photo = state.profilePhotos[name]) {
 }
 
 function profileView() {
-  const people = sync ? state.spaceMembers : partners;
+  const people = partners();
   return `<div class="heading profile-heading">
     ${pageHeading('Profile')}
     <button class="profile-settings" data-go="settings" aria-label="Settings">
@@ -399,7 +416,10 @@ function coupleView() {
   const partner = state.spaceMembers.find((name) => name !== member.name);
   return `${pageHeading('Couple connection', {parent: 'Profile'})}
     <section class="panel"><h2>${partner ? 'Connected' : 'Waiting for your partner'}</h2>
-      <p class="muted">${partner ? `You and ${esc(partner)} share this Duvie space.` : 'Your partner’s account can be linked to this Duvie space.'}</p>
+      <p class="muted">${partner ? `You and ${esc(partner)} share this Duvie space.` : 'Ask your partner to create an account and enter a couple code.'}</p>
+      ${partner ? '' : `<button class="action" data-couple-code>${coupleCode ? 'Generate a new code' : 'Get a couple code'}</button>
+        ${coupleCode ? `<label class="couple-code">Couple code<input readonly value="${esc(coupleCode)}" aria-describedby="couple-code-help"></label>
+          <button data-copy-couple-code>Copy code</button><p class="muted" id="couple-code-help">Share privately with your partner. The code can be used once and expires in 24 hours.</p>` : ''}`}
     </section>`;
 }
 
@@ -472,28 +492,50 @@ function passwordView(fromLink) {
     </div>`;
 }
 
+function onboardingView() {
+  const joining = onboardingMode === 'join-space';
+  return `${pageHeading(joining ? 'Join your partner' : 'Set up your space')}
+    <div class="panel">
+      <form id="space-setup" method="post">
+        <label>Your name<input name="displayName" autocomplete="given-name" maxlength="30" value="${esc(onboardingName)}" required></label>
+        ${joining ? '<label>Couple code<input name="coupleCode" autocapitalize="none" spellcheck="false" required></label>' : ''}
+        <button class="primary">${joining ? 'Join space' : 'Create a space'}</button>
+      </form>
+      <div class="auth-options">
+        <button data-onboarding-mode="${joining ? 'create-space' : 'join-space'}">${joining ? 'Create my own space' : 'I have a couple code'}</button>
+        <button data-sign-out>Sign out</button>
+      </div>
+    </div>`;
+}
+
 function connectionView() {
   if (connection === 'loading') return '<h1>Connecting to Duvie…</h1>';
   if (connection === 'error') return '<h1>Connection unavailable</h1><p>Refresh to try again.</p>';
-  if (connection === 'unlinked') {
-    return '<h1>Pairing pending</h1><p>Your account needs to be linked to the Duvie space.</p><button data-sign-out>Sign out</button>';
-  }
+  if (connection === 'unlinked') return onboardingView();
   if (connection === 'password-setup') return passwordView(true);
+  if (authView === 'confirm-email') {
+    return `${pageHeading('Check your email')}
+      <section class="panel">
+        <p>Open the confirmation link sent to <strong>${esc(authEmail)}</strong>, to finish creating your account.</p>
+        <button class="auth-option" data-auth-view="sign-in">Back to sign in</button>
+      </section>`;
+  }
 
   const passwordSignIn = authView === 'sign-in';
-  const reset = authView === 'password-link';
-  const title = passwordSignIn ? 'Sign in' : reset ? 'Set or reset password' : 'Email me a sign-in link';
-  const submit = passwordSignIn ? 'Sign in' : reset ? 'Send password link' : 'Send sign-in link';
+  const creating = authView === 'create-account';
+  const title = passwordSignIn ? 'Sign in' : creating ? 'Create account' : 'Reset password';
+  const submit = passwordSignIn || creating ? title : 'Send reset link';
   return `${pageHeading(title)}
     <div class="panel">
       <form id="${authView}" method="post">
-        <label>Invited email address<input type="email" name="email" autocomplete="username" autocapitalize="none" value="${esc(authEmail)}" required></label>
+        <label>Email address<input type="email" name="email" autocomplete="username" autocapitalize="none" value="${esc(authEmail)}" required></label>
         ${passwordSignIn ? '<label>Password<input type="password" name="password" autocomplete="current-password" required></label>' : ''}
+        ${creating ? '<label>Password<input type="password" name="password" autocomplete="new-password" minlength="12" maxlength="72" aria-describedby="signup-password-help" required></label><p class="muted" id="signup-password-help">Use at least 12 characters.</p>' : ''}
         <button class="primary">${submit}</button>
       </form>
       ${passwordSignIn ? `<div class="auth-options">
-        <button data-auth-view="password-link">Set or reset password</button>
-        <button data-auth-view="email-link">Email me a sign-in link</button>
+        <button data-auth-view="password-link">Forgot password?</button>
+        <button data-auth-view="create-account">Create account</button>
       </div>` : '<button class="auth-option" data-auth-view="sign-in">Back to sign in</button>'}
     </div>`;
 }
@@ -522,6 +564,9 @@ async function showSession(session, {setupPassword = false, continueSetup = fals
   if (nextId === sessionId && !setupPassword && !continueSetup) return;
   sessionId = nextId;
   sessionEmail = session?.user?.email ?? '';
+  onboardingMode = 'create-space';
+  onboardingName = '';
+  coupleCode = '';
   const version = ++connectionVersion;
   member = null;
   profilePartner = null;
@@ -567,8 +612,8 @@ async function submitAuth(form, data, submit) {
   const id = form.id;
   const email = data.email.trim();
   const password = data.password;
-  if (id === 'set-password') {
-    if (password !== data.confirmation) return report('The passwords don’t match.');
+  if (id === 'set-password' || id === 'create-account') {
+    if (id === 'set-password' && password !== data.confirmation) return report('The passwords don’t match.');
     if (password.length < 12 || new TextEncoder().encode(password).length > 72) {
       return report('Use 12 to 72 characters. Some symbols and emoji take more space.');
     }
@@ -585,6 +630,17 @@ async function submitAuth(form, data, submit) {
       const session = await sync.signIn(email, password);
       // Safari can offer to save or autofill credentials from the password form.
       await showSession(session);
+    } else if (id === 'create-account') {
+      report('Creating your account…');
+      const result = await sync.signUp(email, password);
+      if (version !== connectionVersion) return;
+      if (result.session) await showSession(result.session);
+      else {
+        authEmail = email;
+        authView = result.user?.identities?.length === 0 ? 'sign-in' : 'confirm-email';
+        render();
+        report(authView === 'sign-in' ? 'Try signing in, or use Forgot password to recover your account.' : '');
+      }
     } else if (id === 'set-password') {
       report('Saving password…');
       await sync.updatePassword(password);
@@ -598,8 +654,7 @@ async function submitAuth(form, data, submit) {
       if (connection === 'ready') report('Password saved.');
     } else {
       report('Sending email…');
-      if (id === 'password-link') await sync.sendPasswordLink(email);
-      else await sync.sendLink(email);
+      await sync.sendPasswordLink(email);
       if (version === connectionVersion) {
         report('If this email can receive Duvie links, one should arrive shortly. Open it in Safari.');
       }
@@ -610,14 +665,25 @@ async function submitAuth(form, data, submit) {
     if (code === 'over_email_send_rate_limit' || code === 'over_request_rate_limit') {
       report('Too many attempts. Wait a little, then try again.');
     } else if (code === 'email_address_not_authorized') {
-      report('Duvie could not send an email to this address. If you have your original invite, open that in Safari.');
+      report('Duvie couldn’t send an email to this address. Please try again later.');
     } else if (id === 'sign-in') {
       report(code === 'invalid_credentials' || code === 'email_not_confirmed'
-        ? 'Couldn’t sign in. Check your email and password, or use Set or reset password.'
+        ? 'Couldn’t sign in. Check your email and password, or use Forgot password.'
         : 'Couldn’t connect to sign in. Try again in a moment.');
+    } else if (id === 'create-account') {
+      if (code === 'user_already_exists' || code === 'email_exists') {
+        authEmail = email;
+        authView = 'sign-in';
+        render();
+        report('Try signing in, or use Forgot password to recover your account.');
+      } else if (code === 'weak_password') {
+        report('Choose a stronger password.');
+      } else {
+        report('Couldn’t create your account. Check your email and try again.');
+      }
     } else if (id === 'set-password') {
       if (code === 'reauthentication_needed' || code === 'session_not_found') {
-        report('Duvie needs a fresh sign-in. Sign out, then use Set or reset password.');
+        report('Duvie needs a fresh sign-in. Sign out, then use Forgot password.');
       } else if (code === 'weak_password' || code === 'same_password') {
         report('Choose a stronger password you haven’t used for Duvie before.');
       } else {
@@ -631,6 +697,32 @@ async function submitAuth(form, data, submit) {
     screen.inert = false;
     nav.inert = false;
     if (screen.contains(form)) submit.focus({preventScroll: true});
+  }
+}
+
+async function submitSpace(form) {
+  if (connection !== 'unlinked' || authBusy) return;
+  const data = new FormData(form);
+  const name = data.get('displayName').trim();
+  const code = data.get('coupleCode')?.replace(/[\s-]/g, '').toLowerCase() ?? null;
+  if (!name || name.toLowerCase() === 'together') return report('Choose a name to display in Duvie.');
+  if (code !== null && !/^[a-f0-9]{32}$/.test(code)) return report('Enter the full couple code from your partner.');
+  authBusy = true;
+  screen.inert = true;
+  const version = connectionVersion;
+  try {
+    report(code ? 'Joining your partner…' : 'Creating your space…');
+    const session = await sync.getSession();
+    if (!session || version !== connectionVersion) return;
+    await sync.onboard(name, code);
+    if (version === connectionVersion) await showSession(session, {continueSetup: true});
+  } catch (error) {
+    if (version !== connectionVersion) return;
+    if (error?.code === 'P0001') report(error.message);
+    else report('Couldn’t set up your space. Try again.');
+  } finally {
+    authBusy = false;
+    screen.inert = false;
   }
 }
 
@@ -667,11 +759,18 @@ document.addEventListener('click', async (event) => {
     return;
   }
   if (button.dataset.authView && connection === 'sign-in') {
-    authEmail = screen.querySelector('input[name="email"]').value;
+    authEmail = screen.querySelector('input[name="email"]')?.value ?? authEmail;
     authView = button.dataset.authView;
     report('');
     render();
-    screen.querySelector('input[name="email"]').focus();
+    screen.querySelector('input[name="email"]')?.focus();
+    return;
+  }
+  if (button.dataset.onboardingMode && connection === 'unlinked') {
+    onboardingName = screen.querySelector('input[name="displayName"]').value;
+    onboardingMode = button.dataset.onboardingMode;
+    report('');
+    render();
     return;
   }
   if (button.hasAttribute('data-sign-out')) {
@@ -690,6 +789,33 @@ document.addEventListener('click', async (event) => {
     return;
   }
   if (sync && connection !== 'ready') return;
+  if (button.hasAttribute('data-copy-couple-code')) {
+    const input = screen.querySelector('.couple-code input');
+    try {
+      await navigator.clipboard.writeText(input.value);
+      report('Couple code copied.');
+    } catch {
+      input.focus();
+      input.select();
+      report('Copy the selected code to share it.');
+    }
+    return;
+  }
+  if (button.hasAttribute('data-couple-code')) {
+    const version = connectionVersion;
+    button.disabled = true;
+    try {
+      const code = await sync.createCoupleCode();
+      if (version !== connectionVersion) return;
+      coupleCode = code;
+      if (page === 'couple') render();
+    } catch {
+      if (version === connectionVersion) report('Couldn’t create a code. Refresh shared data and try again.');
+    } finally {
+      button.disabled = false;
+    }
+    return;
+  }
   const {page:tab, go, date:day, mode, period, routineShift, edit, goal:target, complete} = button.dataset;
   if (button.hasAttribute('data-pat')) {
     if (animationsEnabled()) {
@@ -697,14 +823,14 @@ document.addEventListener('click', async (event) => {
       void button.offsetWidth;
       button.classList.add('pat');
     }
-    document.querySelector('#pet-note').textContent = Object.values(state.answers).some((a) => a.Lyn && a.Edison)
+    document.querySelector('#pet-note').textContent = Object.values(state.answers).some((a) => hasSharedAnswers(a))
       ? 'Your otter balances the stone and catches it.' : 'Your otter gives a little wiggle.';
     return;
   }
   const previousPage = page;
   if (button.dataset.profileFor) {
     const name = button.dataset.profileFor;
-    if (!partners.includes(name) || !canEdit(name)) return;
+    if (!partners().includes(name) || !canEdit(name)) return;
     profilePartner = name;
     draftPhoto = null;
     page = 'edit-profile';
@@ -798,14 +924,12 @@ screen.addEventListener('change', async ({target}) => {
   }
   const {habit, partner} = target.dataset;
   const day = routineDate;
-  if (habit === undefined || !partners.includes(partner) || day > today() || !canEdit(partner)) return;
+  if (habit === undefined || !partners().includes(partner) || day > today() || !canEdit(partner)) return;
   if (!await storeChange('routines', 'upsert', {day, member_id: member?.user_id, habit: Number(habit), done: target.checked})) {
     target.checked = Boolean(routineLog(day, partner)[habit]);
     return;
   }
-  state.logs[day] ??= {};
-  state.logs[day][partner] ??= {};
-  state.logs[day][partner][habit] = target.checked;
+  state.logs[day] = {...state.logs[day], [partner]: {...routineLog(day, partner), [habit]: target.checked}};
   save();
   screen.querySelector('#daily-commitment').textContent = dailyCommitment();
 });
@@ -813,7 +937,11 @@ screen.addEventListener('change', async ({target}) => {
 screen.addEventListener('submit', async (event) => {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.target));
-  if (sync && ['sign-in', 'password-link', 'email-link', 'set-password'].includes(event.target.id)) {
+  if (sync && event.target.id === 'space-setup') {
+    await submitSpace(event.target);
+    return;
+  }
+  if (sync && ['sign-in', 'password-link', 'create-account', 'set-password'].includes(event.target.id)) {
     await submitAuth(event.target, data, event.submitter || event.target.querySelector('[type="submit"], button.primary'));
     return;
   }
@@ -827,7 +955,7 @@ screen.addEventListener('submit', async (event) => {
       if (!name || !canEdit(name) || (!removing && !photo)) return;
       if (refreshing) return report('Duvie is refreshing. Try saving again in a moment.');
       if (sync && !await storeChange('profilePhotos', 'upsert', {member_id: member.user_id, photo})) return;
-      state.profilePhotos[name] = photo;
+      state.profilePhotos = {...state.profilePhotos, [name]: photo};
       profilePartner = null;
       draftPhoto = null;
       page = 'profile';
@@ -836,7 +964,7 @@ screen.addEventListener('submit', async (event) => {
     }
     case 'event': {
       if (!data.title.trim()) return error('Enter an event name.');
-      if (![...partners, 'Together'].includes(data.owner)) return error('Choose who the event is for.');
+      if (![...partners(), 'Together'].includes(data.owner)) return error('Choose who the event is for.');
       if (data.end && data.end <= data.start) return error('End time must be after start time.');
       const item = { ...data,title:data.title.trim(),date:plannerDate,id:editing || crypto.randomUUID() };
       const values = {day: item.date, title: item.title, starts: item.start, ends: item.end || null, owner: item.owner};
@@ -849,13 +977,12 @@ screen.addEventListener('submit', async (event) => {
     }
     case 'checkin': {
       const {author} = event.target.dataset;
-      if (!partners.includes(author) || !canEdit(author)) return;
+      if (!partners().includes(author) || !canEdit(author)) return;
       const answer = data.answer.trim();
       if (!answer) return error('Write an answer before sharing.');
       const weekStart = week();
       if (!await storeChange('answers', 'upsert', {week_start: weekStart, author_id: member?.user_id, answer})) return;
-      state.answers[weekStart] ??= {};
-      state.answers[weekStart][author] = answer;
+      state.answers[weekStart] = {...state.answers[weekStart], [author]: answer};
       answerAuthor = null;
       break;
     }

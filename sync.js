@@ -67,11 +67,17 @@
     async updatePassword(password) {
       rows(await client.auth.updateUser({password}));
     },
-    async sendLink(email) {
-      return rows(await client.auth.signInWithOtp({
-        email,
-        options: {shouldCreateUser: false, emailRedirectTo: new URL('/', location.origin).href}
+    async signUp(email, password) {
+      return rows(await client.auth.signUp({
+        email, password,
+        options: {emailRedirectTo: new URL('/', location.origin).href}
       }));
+    },
+    async onboard(name, code) {
+      return rows(await client.rpc('onboard_duvie_space', {display_name: name, partner_code: code}));
+    },
+    async createCoupleCode() {
+      return rows(await client.rpc('create_duvie_couple_code'));
     },
     async signOut() {
       rows(await client.auth.signOut({scope: 'local'}));
@@ -80,25 +86,26 @@
       return rows(await client.from('duvie_members').select('space_id,name,user_id').eq('user_id', userId).maybeSingle());
     },
     async load(spaceId) {
-      const [members, events, routines, milestones, answers, photos] = await Promise.all([
+      const [members, events, routines, milestones, answers, photos, space] = await Promise.all([
         read('duvie_members', spaceId, ['name']),
         read(tables.events, spaceId, ['id']),
         read(tables.routines, spaceId, ['member_id', 'day', 'habit']),
         read(tables.milestones, spaceId, ['created_at', 'id']),
         read(tables.answers, spaceId, ['author_id', 'week_start']),
-        read(tables.profilePhotos, spaceId, ['member_id'])
+        read(tables.profilePhotos, spaceId, ['member_id']),
+        client.from('duvie_spaces').select('plan_start').eq('id', spaceId).single().then(rows)
       ]);
       const names = Object.fromEntries(members.map(({user_id, name}) => [user_id, name]));
       const logs = {};
       const weekly = {};
       const byGoal = [[], []];
       for (const {member_id, day, habit, done} of routines) {
-        logs[day] ??= {};
+        logs[day] ??= Object.create(null);
         logs[day][names[member_id]] ??= {};
         logs[day][names[member_id]][habit] = done;
       }
       for (const {author_id, week_start, answer} of answers) {
-        weekly[week_start] ??= {};
+        weekly[week_start] ??= Object.create(null);
         weekly[week_start][names[author_id]] = answer;
       }
       for (const {goal, id, title, done} of milestones) byGoal[goal].push({id, title, done});
@@ -106,6 +113,7 @@
         events: events.map(({id, day, title, starts, ends, owner}) =>
           ({id, date: day, title, start: starts.slice(0, 5), end: ends?.slice(0, 5) || '', owner})),
         logs, milestones: byGoal, answers: weekly,
+        planStart: space.plan_start,
         spaceMembers: members.map(({name}) => name),
         profilePhotos: Object.fromEntries(photos.map(({member_id, photo}) => [names[member_id], photo]))
       };

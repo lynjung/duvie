@@ -657,3 +657,17 @@ textarea { resize: vertical; }
 }
 
 .auth-options, .auth-option { margin-top: 8px; }
+
+.couple-code {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.couple-code input {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
