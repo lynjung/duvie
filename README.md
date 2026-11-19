@@ -37,9 +37,9 @@ Duvie is under active development. The local checkout is configured for Supabase
 
 ## Sign in
 
-Use **Sign in** with your existing email address and password. Sign-in and password screens share a narrow, mobile-first layout with the title, messages, fields, and actions aligned. **Forgot password?** sends a reset link. Sign-in and recovery errors use a muted red banner. Progress and confirmations use the app accent color.
+Use **Sign in** with your existing email address and password. Sign-in and password screens share a narrow, mobile-first layout with the title, messages, fields, and actions aligned. **Reset password** opens the form for requesting a reset link. After submitting, **Check your email** explains what to do next and provides a way back to the form or sign-in. Sign-in and recovery errors use a compact muted red notice above the form. Progress and confirmations use the app accent color.
 
-New account signup and couple codes are prepared. Enable `signupEnabled` in `sync-config.js` after applying the couple onboarding migration and verifying email delivery in the hosted environment. Existing accounts can sign in while signup is disabled.
+New account signup and couple codes are prepared. Couple setup uses stacked actions with consistent spacing, and the code screen places **Copy code** below the code and sharing instructions. New passwords must be 12–32 characters. Rate-limit errors say “Too many attempts. Please try again later.” Enable `signupEnabled` in `sync-config.js` after applying the couple onboarding migration and verifying email delivery in the hosted environment. Existing accounts can sign in while signup is disabled.
 
 Supabase’s default sender handles password recovery during testing. To send account emails as **Duvie Team** and reach users outside the project team, connect an email provider through [Supabase Custom SMTP](https://supabase.com/docs/guides/auth/auth-smtp) and set the sender name there.
 

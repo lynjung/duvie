@@ -438,11 +438,22 @@ function settingsView() {
 function coupleView() {
   const partner = state.spaceMembers.find((name) => name !== member.name);
   return `${pageHeading('Couple connection', {parent: 'Profile'})}
-    <section class="panel"><h2>${partner ? 'Connected' : 'Waiting for your partner'}</h2>
-      <p class="muted">${partner ? `You and ${esc(partner)} share this Duvie space.` : (sync.signupEnabled ? 'Ask your partner to create an account and enter a couple code.' : 'Your partner’s account can be linked to this Duvie space.')}</p>
-      ${partner || !sync.signupEnabled ? '' : `<button class="action" data-couple-code>${coupleCode ? 'Generate a new code' : 'Get a couple code'}</button>
-        ${coupleCode ? `<label class="couple-code">Couple code<input readonly value="${esc(coupleCode)}" aria-describedby="couple-code-help"></label>
-          <button data-copy-couple-code>Copy code</button><p class="muted" id="couple-code-help">Share privately with your partner. The code can be used once and expires in 24 hours.</p>` : ''}`}
+    <section class="panel couple-details">
+      <div class="couple-intro">
+        <h2>${partner ? 'Connected' : 'Waiting for your partner'}</h2>
+        <p class="muted">${partner ? `You and ${esc(partner)} share this Duvie space.` : (sync.signupEnabled ? 'Ask your partner to create an account and enter a couple code.' : 'Your partner’s account can be linked to this Duvie space.')}</p>
+      </div>
+      ${partner || !sync.signupEnabled ? '' : coupleCode ? `
+        <div class="couple-code">
+          <label for="couple-code-value">Couple code</label>
+          <input id="couple-code-value" readonly value="${esc(coupleCode)}" aria-describedby="couple-code-help">
+          <p class="muted" id="couple-code-help">Share privately with your partner. The code can be used once and expires in 24 hours.</p>
+        </div>
+        <div class="couple-actions">
+          <button class="primary" data-copy-couple-code>Copy code</button>
+          <button class="text-action" data-couple-code>Generate a new code</button>
+        </div>
+      ` : '<button class="primary" data-couple-code>Get a couple code</button>'}
     </section>`;
 }
 
@@ -513,9 +524,9 @@ function passwordView(fromLink) {
   return authLayout(fromLink ? 'Set your password' : 'Set or change password', `
     <form id="set-password" method="post">
       <label>Email address<input type="email" name="email" autocomplete="username" value="${esc(sessionEmail)}" readonly></label>
-      <label>New password<input type="password" name="password" autocomplete="new-password" minlength="12" maxlength="72" aria-describedby="password-help" required></label>
-      <label>Confirm password<input type="password" name="confirmation" autocomplete="new-password" minlength="12" maxlength="72" required></label>
-      <p class="muted auth-hint" id="password-help">Use at least 12 characters.</p>
+      <label>New password<input type="password" name="password" autocomplete="new-password" minlength="12" maxlength="32" aria-describedby="password-help" required></label>
+      <label>Confirm password<input type="password" name="confirmation" autocomplete="new-password" minlength="12" maxlength="32" required></label>
+      <p class="muted auth-hint" id="password-help">Use 12–32 characters.</p>
       <button class="primary">Save password</button>
     </form>
     ${fromLink ? '<button class="auth-option" data-skip-password>Skip for now</button>' : ''}
@@ -530,7 +541,7 @@ function onboardingView() {
       ${joining ? '<label>Couple code<input name="coupleCode" autocapitalize="none" spellcheck="false" required></label>' : ''}
       <button class="primary">${joining ? 'Join space' : 'Create a space'}</button>
     </form>
-    <div class="auth-options">
+    <div class="auth-options couple-options">
       <button data-onboarding-mode="${joining ? 'create-space' : 'join-space'}">${joining ? 'Create my own space' : 'I have a couple code'}</button>
       <button data-sign-out>Sign out</button>
     </div>
@@ -549,10 +560,16 @@ function connectionView() {
     `);
   }
   if (connection === 'password-setup') return passwordView(true);
-  if (authView === 'confirm-email') {
+  if (authView === 'confirm-email' || authView === 'reset-email') {
+    const resetting = authView === 'reset-email';
     return authLayout('Check your email', `
-      <p>Open the confirmation link sent to <strong>${esc(authEmail)}</strong> to finish creating your account.</p>
-      ${backToSignIn}
+      <p>${resetting
+        ? 'Follow the link in the email to reset your password.'
+        : `Follow the link we sent to <strong>${esc(authEmail)}</strong> to confirm your email address.`}</p>
+      ${resetting ? `<div class="auth-options">
+        <button data-auth-view="password-link">Change email address</button>
+        ${backToSignIn}
+      </div>` : backToSignIn}
     `);
   }
 
@@ -564,11 +581,11 @@ function connectionView() {
     <form id="${authView}" method="post">
       <label>Email address<input type="email" name="email" autocomplete="username" autocapitalize="none" value="${esc(authEmail)}" required></label>
       ${passwordSignIn ? '<label>Password<input type="password" name="password" autocomplete="current-password" required></label>' : ''}
-      ${creating ? '<label>Password<input type="password" name="password" autocomplete="new-password" minlength="12" maxlength="72" aria-describedby="password-help" required></label><p class="muted auth-hint" id="password-help">Use at least 12 characters.</p>' : ''}
+      ${creating ? '<label>Password<input type="password" name="password" autocomplete="new-password" minlength="12" maxlength="32" aria-describedby="password-help" required></label><p class="muted auth-hint" id="password-help">Use 12–32 characters.</p>' : ''}
       <button class="primary">${submit}</button>
     </form>
     ${passwordSignIn ? `<div class="auth-options">
-      <button data-auth-view="password-link">Forgot password?</button>
+      <button data-auth-view="password-link">Reset password</button>
       ${sync.signupEnabled ? '<button data-auth-view="create-account">Create account</button>' : ''}
     </div>` : backToSignIn}
   `);
@@ -651,8 +668,11 @@ async function submitAuth(form, data, submit) {
   const password = data.password;
   if (id === 'set-password' || id === 'create-account') {
     if (id === 'set-password' && password !== data.confirmation) return reportError('The passwords don’t match.');
-    if (password.length < 12 || new TextEncoder().encode(password).length > 72) {
-      return reportError('Use 12 to 72 characters. Some symbols and emoji take more space.');
+    if (password.length < 12 || password.length > 32) {
+      return reportError('Use 12–32 characters.');
+    }
+    if (new TextEncoder().encode(password).length > 72) {
+      return reportError('Use fewer symbols or emoji in your password.');
     }
   }
 
@@ -675,7 +695,7 @@ async function submitAuth(form, data, submit) {
         authEmail = email;
         authView = result.user?.identities?.length === 0 ? 'sign-in' : 'confirm-email';
         render();
-        report(authView === 'sign-in' ? 'Try signing in, or use Forgot password to recover your account.' : '');
+        report(authView === 'sign-in' ? 'Sign in or reset your password.' : '');
       }
     } else if (id === 'set-password') {
       report('Saving password…');
@@ -692,26 +712,33 @@ async function submitAuth(form, data, submit) {
       report('Sending email…');
       await sync.sendPasswordLink(email);
       if (version === connectionVersion) {
-        report('Check your email for a reset link. Open it in the browser you use for Duvie.');
+        authEmail = email;
+        authView = 'reset-email';
+        report('');
+        render();
+        const heading = screen.querySelector('h1');
+        heading.tabIndex = -1;
+        screen.inert = false;
+        heading.focus();
       }
     }
   } catch (error) {
     if (version !== connectionVersion) return;
     const code = error?.code;
     if (code === 'over_email_send_rate_limit' || code === 'over_request_rate_limit') {
-      reportError('Too many attempts. Wait a little, then try again.');
+      reportError('Too many attempts. Please try again later.');
     } else if (code === 'email_address_not_authorized') {
       reportError('Duvie couldn’t send an email to this address. Please try again later.');
     } else if (id === 'sign-in') {
       reportError(code === 'invalid_credentials' || code === 'email_not_confirmed'
-        ? 'Couldn’t sign in with that email and password. Try again or tap Forgot password?'
+        ? 'Email or password didn’t match.'
         : 'Couldn’t connect to sign in. Try again in a moment.');
     } else if (id === 'create-account') {
       if (code === 'user_already_exists' || code === 'email_exists') {
         authEmail = email;
         authView = 'sign-in';
         render();
-        report('Try signing in, or use Forgot password to recover your account.');
+        report('Sign in or reset your password.');
       } else if (code === 'weak_password') {
         reportError('Choose a stronger password.');
       } else {
@@ -719,7 +746,7 @@ async function submitAuth(form, data, submit) {
       }
     } else if (id === 'set-password') {
       if (code === 'reauthentication_needed' || code === 'session_not_found') {
-        reportError('Duvie needs a fresh sign-in. Sign out, then use Forgot password.');
+        reportError('Duvie needs a fresh sign-in. Sign out, then reset your password.');
       } else if (code === 'weak_password' || code === 'same_password') {
         reportError('Choose a stronger password you haven’t used for Duvie before.');
       } else {

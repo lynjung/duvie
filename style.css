@@ -734,6 +734,8 @@ textarea { resize: vertical; }
   font-weight: 575;
 }
 
+.auth-flow h1[tabindex="-1"]:focus { outline: none; }
+
 .auth-flow form {
   gap: 16px;
   margin-top: 0;
@@ -762,6 +764,13 @@ textarea { resize: vertical; }
 
 .auth-flow .sync-message { margin: 0 0 16px; }
 
+.auth-flow .sync-message-error {
+  border-inline-start: 2px solid #cb8b81;
+  border-radius: 6px;
+  padding: 8px 12px;
+  line-height: 1.4;
+}
+
 .auth-options {
   display: flex;
   flex-wrap: wrap;
@@ -775,18 +784,63 @@ textarea { resize: vertical; }
 }
 
 .auth-options, .auth-option { margin-top: 8px; }
+.auth-options .auth-option { margin-top: 0; }
 .auth-option span { margin-inline-end: 4px; }
+
+.couple-details {
+  display: grid;
+  gap: 24px;
+  padding: 20px;
+}
+
+.couple-intro {
+  display: grid;
+  gap: 8px;
+}
+
+.couple-intro h2 + p { margin-top: 0; }
 
 .couple-code {
   display: grid;
-  gap: 4px;
-  margin-top: 12px;
+  gap: 8px;
+}
+
+.couple-code label {
+  font-size: .9375rem;
+  font-weight: 550;
 }
 
 .couple-code input {
+  width: 100%;
   min-width: 0;
-  padding: 10px;
+  min-height: 50px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--surface);
+}
+
+.couple-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.couple-actions .primary,
+.couple-details > .primary { min-height: 50px; }
+
+.couple-actions .text-action { justify-self: center; }
+
+.couple-options {
+  display: grid;
+  justify-content: stretch;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.couple-options button { text-align: center; }
+
+.couple-options [data-sign-out] {
+  justify-self: center;
+  padding-inline: 12px;
+  color: var(--muted);
 }
