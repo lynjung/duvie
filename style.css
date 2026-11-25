@@ -844,3 +844,36 @@ textarea { resize: vertical; }
   padding-inline: 12px;
   color: var(--muted);
 }
+
+/* Nook leads with shared plans and connection; the pet stays a quiet companion. */
+.nook-heading .nook-date {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: .875rem;
+}
+.nook-today { padding: 16px; }
+.nook-today .heading { flex-wrap: wrap; }
+.nook-today .event { padding-block: 12px; }
+.nook-empty { padding-block: 12px 16px; }
+.nook-empty p + p { margin-top: 4px; }
+.nook-checkin { padding-block: 24px; }
+.nook-eyebrow {
+  margin-bottom: 8px;
+  color: var(--accent);
+  font-size: .8125rem;
+  font-weight: 600;
+}
+.nook-checkin h2 { font-size: 1.25rem; }
+.nook-checkin .primary { margin-top: 16px; }
+.nook-companion {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.nook-companion .pet { width: 100%; gap: 0; padding: 0; font-size: .8125rem; }
+.nook-companion .pet img { width: 100%; }
+.nook-companion h2 { font-size: .9375rem; }
+.nook-companion p { margin-top: 4px; }

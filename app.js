@@ -258,22 +258,41 @@ function nookView() {
   const count = Object.values(state.answers).filter((answers) => hasSharedAnswers(answers)).length;
   const day = today();
   const events = dayEvents(day);
-  return `${pageHeading('Nook', { subtitle: longDate(day) })}
-  <section class="feature-panel nook-pet">
-    <button class="pet${count ? ' learned' : ''}" data-pat>
+  const answers = currentAnswers();
+  const shared = hasSharedAnswers(answers);
+  const answered = partners().filter((partner) => Object.hasOwn(answers, partner));
+  const names = partners().map(esc).join(' & ');
+  const checkinStatus = shared ? 'You’ve both shared this week.'
+    : answered.length ? 'One answer shared. A little time for the other?'
+    : 'Take a moment to reflect together.';
+  return `<div class="page-heading nook-heading">
+    <p class="nook-date">${longDate(day)}</p>
+    <h1>Today, together</h1>
+    ${names ? `<p class="muted">${names}’s shared space</p>` : ''}
+  </div>
+  <section class="feature-panel nook-today" aria-labelledby="nook-today-title">
+    <div class="heading"><h2 id="nook-today-title">Your day</h2><button class="text-action" data-go="planner">View planner</button></div>
+    ${events.length ? eventRows(events.slice(0, 2)) : `<div class="nook-empty">
+      <p>No plans on the calendar yet.</p>
+      <p class="muted">Make a little time for each other today.</p>
+    </div>`}
+    ${events.length > 2 ? `<p class="muted schedule-more">+${events.length - 2} more in your planner</p>` : ''}
+    ${!events.length ? '<button class="action" data-go="planner">Plan today together</button>' : ''}
+  </section>
+  <section class="nook-checkin" aria-labelledby="nook-checkin-title">
+    <p class="nook-eyebrow">A moment for you two</p>
+    <h2 id="nook-checkin-title">What helped us this week?</h2>
+    <p class="muted">${checkinStatus}</p>
+    <button class="primary" data-go="checkin">${shared ? 'Read your answers' : 'Weekly check-in'}</button>
+  </section>
+  <section class="nook-companion" aria-label="Your otter companion">
+    <button class="pet${count ? ' learned' : ''}" data-pat aria-label="Say hi to your otter">
       <img src="nook-otter.png" alt="Otter floating with a stone" width="1774" height="887">
-      Tap to say hi
+      Say hi
     </button>
-    <p class="muted" id="pet-note" aria-live="polite">${count ? `${count} shared check-in${count === 1 ? '' : 's'} · Stone trick learned` : 'Finish a check-in together to teach your otter a stone trick.'}</p>
-  </section>
-  <section class="content-section">
-    <div class="heading"><h2>Today’s schedule</h2><button class="text-action" data-go="planner">Open planner</button></div>
-    ${events.length ? eventRows(events.slice(0, 2)) : '<p class="muted">Nothing on the schedule today.</p>'}
-    ${events.length > 2 ? `<p class="muted schedule-more">+${events.length - 2} more on the schedule</p>` : ''}
-  </section>
-  <section class="content-section">
-    <div class="heading"><h2>Weekly check-in</h2><button class="text-action" data-go="checkin" aria-label="Open weekly check-in">Open</button></div>
-    <p class="muted">What helped us this week?</p>
+    <div><h2>A little company</h2>
+      <p class="muted" id="pet-note" aria-live="polite">${count ? 'Your otter has a stone trick to show you.' : 'Your otter is happy you’re here.'}</p>
+    </div>
   </section>`;
 }
 
